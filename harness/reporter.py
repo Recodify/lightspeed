@@ -73,10 +73,12 @@ def generate_reports(
             avg_read_rows = sum(m["read_rows"] for m in metrics_available) / len(metrics_available)
             avg_read_bytes = sum(m["read_bytes"] for m in metrics_available) / len(metrics_available)
             avg_memory_usage = sum(m["memory_usage"] for m in metrics_available) / len(metrics_available)
+            avg_query_duration_ms = (sum(m["query_duration_ms"] for m in metrics_available) / len(metrics_available))
         else:
             avg_read_rows = 0
             avg_read_bytes = 0
             avg_memory_usage = 0
+            avg_query_duration_ms = 0
 
         query_stats.append({
             "query_name": query_name,
@@ -87,6 +89,7 @@ def generate_reports(
             "p50_ms": p50_ms,
             "p95_ms": p95_ms,
             "p99_ms": p99_ms,
+            "avg_query_duration_ms": avg_query_duration_ms,
             "avg_read_rows": avg_read_rows,
             "avg_read_bytes": avg_read_bytes,
             "avg_memory_usage": avg_memory_usage,
@@ -207,7 +210,7 @@ def _generate_csv_report(
         f.write(f"# variant: {config.variant}\n")
 
         # Write header
-        f.write("query_name,count,errors,error_rate,qps,p50_ms,p95_ms,p99_ms,avg_read_rows,avg_read_bytes,avg_memory_usage\n")
+        f.write("query_name,count,errors,error_rate,qps,p50_ms,p95_ms,p99_ms,avg_query_duration_ms,avg_read_rows,avg_read_bytes,avg_memory_usage\n")
 
         # Write data rows
         for stat in query_stats:
@@ -220,6 +223,7 @@ def _generate_csv_report(
                 f"{stat['p50_ms']:.2f},"
                 f"{stat['p95_ms']:.2f},"
                 f"{stat['p99_ms']:.2f},"
+                f"{stat['avg_query_duration_ms']:.2f},"
                 f"{stat['avg_read_rows']:.0f},"
                 f"{stat['avg_read_bytes']:.0f},"
                 f"{stat['avg_memory_usage']:.0f}\n"
@@ -255,8 +259,8 @@ def _generate_markdown_report(
 
         # Performance table
         f.write("## Query Performance\n\n")
-        f.write("| Query Name | Count | Errors | Error Rate | QPS | p50 (ms) | p95 (ms) | p99 (ms) | Avg Rows Read | Avg Bytes Read | Avg Memory (bytes) |\n")
-        f.write("|------------|-------|--------|------------|-----|----------|----------|----------|---------------|----------------|--------------------|\n")
+        f.write("| Query Name | Count | Errors | Error Rate | QPS | p50 (ms) | p95 (ms) | p99 (ms) | Avg Duration (ms) | Avg Rows Read | Avg Bytes Read | Avg Memory (bytes) |\n")
+        f.write("|------------|-------|--------|------------|-----|----------|----------|----------|-------------------|---------------|----------------|--------------------|\n")
 
         for stat in query_stats:
             f.write(
@@ -268,6 +272,7 @@ def _generate_markdown_report(
                 f"| {stat['p50_ms']:.2f} "
                 f"| {stat['p95_ms']:.2f} "
                 f"| {stat['p99_ms']:.2f} "
+                f"| {stat['avg_query_duration_ms']:.2f} "
                 f"| {stat['avg_read_rows']:.0f} "
                 f"| {stat['avg_read_bytes']:.0f} "
                 f"| {stat['avg_memory_usage']:.0f} |\n"
