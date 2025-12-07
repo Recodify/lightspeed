@@ -43,8 +43,23 @@ def apply_schema(
         logger.info("Fresh schema mode: dropping and recreating database")
         database = config.clickhouse.database
 
+        # For DDL operations, we need to use a database-agnostic connection
+        # Create temporary parameters without database specification
         try:
-            client.execute_no_result(f"DROP DATABASE IF EXISTS {database}")
+            query_params = {
+                "user": config.clickhouse.user,
+            }
+            if config.clickhouse.password:
+                query_params["password"] = config.clickhouse.password
+
+            # Drop database
+            response = client.client.post(
+                client.base_url,
+                params=query_params,
+                content=f"DROP DATABASE IF EXISTS {database}",
+                headers={"Content-Type": "text/plain"}
+            )
+            response.raise_for_status()
             logger.info(f"Dropped database: {database}")
         except Exception as e:
             msg = f"Failed to drop database {database}: {e}"
@@ -54,7 +69,14 @@ def apply_schema(
             failed += 1
 
         try:
-            client.execute_no_result(f"CREATE DATABASE {database}")
+            # Create database
+            response = client.client.post(
+                client.base_url,
+                params=query_params,
+                content=f"CREATE DATABASE {database}",
+                headers={"Content-Type": "text/plain"}
+            )
+            response.raise_for_status()
             logger.info(f"Created database: {database}")
         except Exception as e:
             msg = f"Failed to create database {database}: {e}"
