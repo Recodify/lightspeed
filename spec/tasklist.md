@@ -366,36 +366,36 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
 
 ---
 
-### 13. CLI
+### 13. CLI ✅
 
 **File:** `harness/cli.py`
 
-- [ ] Use `argparse` to define CLI
+- [x] Use `argparse` to define CLI
 
-- [ ] Global arguments:
+- [x] Global arguments:
   - `--config <path>` (required for most commands)
   - `--verbose` (flag)
   - `--dry-run` (flag, for full-run only)
 
-- [ ] Implement `validate` command:
+- [x] Implement `validate` command:
   - Load config
   - Run all validation checks
   - Test ClickHouse connectivity
   - Exit 0 if all pass, exit 1 if any fail
 
-- [ ] Implement `init-db` command:
+- [x] Implement `init-db` command:
   - Load config
   - Create default ClickHouse client (with `timeout_seconds`)
   - Run schema_loader.apply_schema()
   - Exit with appropriate code
 
-- [ ] Implement `load-data` command:
+- [x] Implement `load-data` command:
   - Load config
   - Create default ClickHouse client
   - Run data_loader.load_data()
   - Exit with appropriate code
 
-- [ ] Implement `run-workload` command:
+- [x] Implement `run-workload` command:
   - Load config
   - Create default ClickHouse client (for metrics collection)
   - Run workload_runner.run_workload() (creates its own workload client)
@@ -403,7 +403,7 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
   - Generate reports with reporter
   - Exit with appropriate code
 
-- [ ] Implement `full-run` command:
+- [x] Implement `full-run` command:
   - If `--dry-run`: run validate only
   - Else:
     - Run validate
@@ -415,9 +415,9 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
 - [ ] Implement `compare` command:
   - Arguments: `csv_a`, `csv_b`, `--output <path>`
   - Run comparator.compare_results()
-  - Exit with appropriate code
+  - Exit with appropriate code (deferred - requires Task 11)
 
-- [ ] Add main entrypoint for `python -m harness.cli`
+- [x] Add main entrypoint for `python -m harness.cli`
 
 ---
 
