@@ -4,3 +4,4 @@ coverage/
 __pycache__/
 results/
 readme.local.md
+projects/*-local

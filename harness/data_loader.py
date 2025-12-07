@@ -62,7 +62,7 @@ def load_data(
     variant_root: Path,
     run_name: str,
     config_name: str
-) -> dict[str, int]:
+) -> dict:
     """Load data into ClickHouse tables from files with isolation.
 
     Uses isolated database (one per variant).
@@ -78,13 +78,15 @@ def load_data(
         config_name: Config file name (e.g., 'example_basic')
 
     Returns:
-        Summary dict with: {"files_loaded": N, "bytes_transferred": N}
+        Dict with overall and per-file metrics.
 
     Raises:
         DataLoadError: If data loading fails for any file
     """
     files_loaded = 0
     bytes_transferred = 0
+    file_stats: list[dict] = []
+    overall_start = time.time()
 
     # Compute isolated database name
     isolated_database = compute_isolated_database_name(
@@ -139,18 +141,38 @@ def load_data(
 
                 files_loaded += 1
                 bytes_transferred += file_size
+                file_stats.append({
+                    "table": entry.table,
+                    "file": entry.file,
+                    "source": source,
+                    "bytes": file_size,
+                    "duration_secs": duration,
+                    "duration_ms": duration * 1000,
+                    "throughput_mb_s": throughput_mbps,
+                })
 
             except Exception as e:
                 raise DataLoadError(
                     f"Failed to load {entry.file} ({source}) into {full_table_name}: {e}"
                 )
 
+    total_duration = time.time() - overall_start
+    total_throughput = (
+        (bytes_transferred / (1024 * 1024)) / total_duration if total_duration > 0 else 0
+    )
+    total_duration_ms = total_duration * 1000
+
     logger.debug(
         f"Data loading complete: {files_loaded} files loaded, "
-        f"{format_bytes(bytes_transferred)} total"
+        f"{format_bytes(bytes_transferred)} total "
+        f"in {total_duration:.2f}s ({total_throughput:.2f} MB/s)"
     )
 
     return {
         "files_loaded": files_loaded,
-        "bytes_transferred": bytes_transferred
+        "bytes_transferred": bytes_transferred,
+        "duration_secs": total_duration,
+        "duration_ms": total_duration_ms,
+        "throughput_mb_s": total_throughput,
+        "files": file_stats,
     }

@@ -20,7 +20,7 @@ from harness.config import (
 from harness.data_loader import load_data
 from harness.exceptions import HarnessError
 from harness.metrics_collector import collect_query_log_metrics
-from harness.reporter import generate_reports
+from harness.reporter import generate_reports, generate_data_load_reports
 from harness.schema_loader import apply_schema
 from harness.utils import setup_logging
 from harness.workload_runner import run_workload
@@ -118,6 +118,7 @@ def cmd_init_db(args: argparse.Namespace) -> int:
         project_root = compute_project_root(config)
         results_base = project_root / "results"
         run_name = generate_run_name(results_base, args.run_name if hasattr(args, 'run_name') else None)
+        logger.info(f"Run: {run_name}")
 
         variant_root = compute_variant_root(config)
 
@@ -158,13 +159,23 @@ def cmd_load_data(args: argparse.Namespace) -> int:
         project_root = compute_project_root(config)
         results_base = project_root / "results"
         run_name = generate_run_name(results_base, args.run_name if hasattr(args, 'run_name') else None)
+        logger.info(f"Run: {run_name}")
 
         variant_root = compute_variant_root(config)
 
         logger.debug("Loading data into tables...")
         with ClickHouseClient(config.clickhouse) as client:
-            load_data(config, client, project_root, variant_root, run_name, config_name)
+            data_load_metrics = load_data(config, client, project_root, variant_root, run_name, config_name)
 
+        generate_data_load_reports(
+            config,
+            data_load_metrics,
+            project_root,
+            run_name,
+            config_name,
+        )
+
+        logger.info(f"Results: projects/{config.project}/results/{config_name}/{run_name}/{config.variant}/")
         logger.debug("Data loaded")
         return 0
 
@@ -300,6 +311,7 @@ def cmd_full_run(args: argparse.Namespace) -> int:
         for variant_name in variants_to_run:
             # Resolve variant
             config = resolve_variant_config(base_config, variant_name)
+            data_load_metrics = None
 
             # High-level banner
             logger.info("=" * 60)
@@ -329,7 +341,7 @@ def cmd_full_run(args: argparse.Namespace) -> int:
             logger.info("[3/4] Loading data...")
             variant_root = compute_variant_root(config)
             with ClickHouseClient(config.clickhouse) as client:
-                load_data(config, client, project_root, variant_root, run_name, config_name)
+                data_load_metrics = load_data(config, client, project_root, variant_root, run_name, config_name)
 
             # Step 4: Run workload
             logger.info("[4/4] Running workload...")
@@ -374,6 +386,7 @@ def cmd_full_run(args: argparse.Namespace) -> int:
                 project_root,
                 run_name,
                 config_name,
+                data_load_metrics=data_load_metrics,
             )
 
             logger.info("=" * 60)
@@ -451,6 +464,12 @@ def main() -> int:
     parser_init_db.add_argument("--config", type=str, required=True, help="Path to configuration YAML file")
     parser_init_db.add_argument("--variant", type=str, default="default", help="Variant to run (default: default)")
     parser_init_db.add_argument("--verbose", action="store_true", help="Enable verbose logging (DEBUG level)")
+    parser_init_db.add_argument(
+        "--run-name",
+        type=str,
+        default=None,
+        help="Specify a name for this run (e.g., 'baseline-v1'). If not provided, generates a memorable name like 'brave-penguin'",
+    )
 
     # load-data command
     parser_load_data = subparsers.add_parser(
@@ -460,6 +479,12 @@ def main() -> int:
     parser_load_data.add_argument("--config", type=str, required=True, help="Path to configuration YAML file")
     parser_load_data.add_argument("--variant", type=str, default="default", help="Variant to run (default: default)")
     parser_load_data.add_argument("--verbose", action="store_true", help="Enable verbose logging (DEBUG level)")
+    parser_load_data.add_argument(
+        "--run-name",
+        type=str,
+        default=None,
+        help="Specify a name for this run (e.g., 'baseline-v1'). If not provided, generates a memorable name like 'brave-penguin'",
+    )
 
     # run-workload command
     parser_run_workload = subparsers.add_parser(

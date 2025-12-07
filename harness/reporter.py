@@ -9,7 +9,7 @@ import pandas as pd
 
 from harness.config import BenchmarkConfig
 from harness.workload_runner import ExecutionRecord
-from harness.utils import sanitize_name
+from harness.utils import sanitize_name, format_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,8 @@ def generate_reports(
     workload_metadata: dict,
     project_root: Path,
     run_name: str,
-    config_name: str
+    config_name: str,
+    data_load_metrics: dict | None = None,
 ) -> None:
     """Generate CSV and Markdown reports from benchmark results.
 
@@ -36,6 +37,7 @@ def generate_reports(
         project_root: Project root directory for output files
         run_name: Run name for result isolation (e.g., 'brave-penguin')
         config_name: Config file name (e.g., 'example_basic')
+        data_load_metrics: Optional data load metrics to include in reports
     """
     logger.debug("Generating benchmark reports...")
 
@@ -90,18 +92,9 @@ def generate_reports(
         })
 
     # Generate output paths: results/{config_name}/{run_name}/{variant}/results.csv
-    # Sanitize all path components to match database naming
-    safe_config_name = sanitize_name(config_name)
-    safe_run_name = sanitize_name(run_name)
-    safe_variant = sanitize_name(config.variant)
-
-    csv_output = Path(config.metrics.output_csv)
-    md_output = Path(config.metrics.output_md)
-
-    results_base = project_root / csv_output.parent
-    run_dir = results_base / safe_config_name / safe_run_name / safe_variant
-    csv_path = run_dir / csv_output.name
-    md_path = run_dir / md_output.name
+    run_dir = _build_run_dir(config, project_root, config_name, run_name)
+    csv_path = run_dir / Path(config.metrics.output_csv).name
+    md_path = run_dir / Path(config.metrics.output_md).name
 
     # Generate CSV report
     _generate_csv_report(
@@ -119,7 +112,52 @@ def generate_reports(
         config
     )
 
+    # Generate data load outputs if provided
+    if data_load_metrics is not None:
+        data_csv_path = run_dir / Path(config.metrics.data_output_csv).name
+        _generate_data_load_csv(
+            data_csv_path,
+            data_load_metrics,
+            config
+        )
+        _write_data_load_markdown(
+            md_path,
+            data_load_metrics,
+            config,
+            append=True
+        )
+        logger.info(f"Data load results saved: {data_csv_path.relative_to(project_root.parent.parent)}")
+
     logger.info(f"Results saved: {csv_path.relative_to(project_root.parent.parent)}")
+
+
+def generate_data_load_reports(
+    config: BenchmarkConfig,
+    data_load_metrics: dict,
+    project_root: Path,
+    run_name: str,
+    config_name: str,
+) -> None:
+    """Generate CSV and Markdown outputs for data loading only."""
+    logger.debug("Generating data load reports...")
+
+    run_dir = _build_run_dir(config, project_root, config_name, run_name)
+    data_csv_path = run_dir / Path(config.metrics.data_output_csv).name
+    md_path = run_dir / Path(config.metrics.output_md).name
+
+    _generate_data_load_csv(
+        data_csv_path,
+        data_load_metrics,
+        config
+    )
+    _write_data_load_markdown(
+        md_path,
+        data_load_metrics,
+        config,
+        append=False
+    )
+
+    logger.info(f"Data load results saved: {data_csv_path.relative_to(project_root.parent.parent)}")
 
 
 def _generate_csv_report(
@@ -219,3 +257,98 @@ def _generate_markdown_report(
         f.write(f"- **Overall QPS**: {overall_qps:.2f}\n")
 
     logger.debug(f"Markdown report written to {output_path}")
+
+
+def _generate_data_load_csv(
+    output_path: Path,
+    data_load_metrics: dict,
+    config: BenchmarkConfig
+) -> None:
+    """Generate CSV with per-file data load metrics."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    files = data_load_metrics.get("files", [])
+
+    with open(output_path, "w") as f:
+        f.write(f"# project: {config.project}\n")
+        f.write(f"# variant: {config.variant}\n")
+        f.write(f"# total_files: {data_load_metrics.get('files_loaded', len(files))}\n")
+        f.write(f"# total_bytes: {data_load_metrics.get('bytes_transferred', 0)}\n")
+        f.write(f"# duration_secs: {data_load_metrics.get('duration_secs', 0):.4f}\n")
+        f.write(f"# duration_ms: {data_load_metrics.get('duration_ms', data_load_metrics.get('duration_secs', 0) * 1000):.2f}\n")
+        f.write(f"# throughput_mb_s: {data_load_metrics.get('throughput_mb_s', 0):.4f}\n")
+        f.write("table,file,source,bytes,duration_ms,throughput_mb_s\n")
+
+        for entry in files:
+            f.write(
+                f"{entry.get('table','')},"
+                f"{entry.get('file','')},"
+                f"{entry.get('source','')},"
+                f"{entry.get('bytes',0)},"
+                f"{entry.get('duration_ms', entry.get('duration_secs',0) * 1000):.2f},"
+                f"{entry.get('throughput_mb_s',0):.4f}\n"
+            )
+
+    logger.debug(f"Data load CSV written to {output_path}")
+
+
+def _write_data_load_markdown(
+    output_path: Path,
+    data_load_metrics: dict,
+    config: BenchmarkConfig,
+    append: bool,
+) -> None:
+    """Write or append a Data Load section to a Markdown report."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    files = data_load_metrics.get("files", [])
+
+    already_exists = output_path.exists()
+    mode = "a" if append and already_exists else "w"
+
+    with open(output_path, mode) as f:
+        if mode == "a" and already_exists:
+            f.write("\n\n")
+        else:
+            f.write("# Benchmark Results\n\n")
+
+        f.write("## Data Load\n\n")
+        f.write(f"- **Project**: {config.project}\n")
+        f.write(f"- **Variant**: {config.variant}\n")
+        f.write(f"- **Load Method**: {config.data.load_method}\n")
+        f.write(f"- **Truncate Before Load**: {config.data.truncate_before_load}\n")
+        f.write(f"- **Total Files**: {data_load_metrics.get('files_loaded', len(files))}\n")
+        f.write(f"- **Total Bytes**: {format_bytes(data_load_metrics.get('bytes_transferred', 0))}\n")
+        duration_secs = data_load_metrics.get('duration_secs', 0)
+        duration_ms = data_load_metrics.get('duration_ms', duration_secs * 1000)
+        f.write(f"- **Duration**: {duration_secs:.2f} seconds ({duration_ms:.0f} ms)\n")
+        f.write(f"- **Throughput**: {data_load_metrics.get('throughput_mb_s', 0):.2f} MB/s\n\n")
+
+        f.write("| Table | File | Source | Bytes | Duration (ms) | Throughput (MB/s) |\n")
+        f.write("|-------|------|--------|-------|---------------|-------------------|\n")
+
+        for entry in files:
+            f.write(
+                f"| {entry.get('table','')} "
+                f"| {entry.get('file','')} "
+                f"| {entry.get('source','')} "
+                f"| {format_bytes(entry.get('bytes', 0))} "
+                f"| {entry.get('duration_ms', entry.get('duration_secs', 0) * 1000):.0f} "
+                f"| {entry.get('throughput_mb_s', 0):.2f} |\n"
+            )
+
+    logger.debug(f"Data load markdown written to {output_path} (append={append})")
+
+
+def _build_run_dir(
+    config: BenchmarkConfig,
+    project_root: Path,
+    config_name: str,
+    run_name: str
+) -> Path:
+    """Build variant run directory based on config, run, and variant names."""
+    safe_config_name = sanitize_name(config_name)
+    safe_run_name = sanitize_name(run_name)
+    safe_variant = sanitize_name(config.variant)
+
+    csv_output = Path(config.metrics.output_csv)
+    results_base = project_root / csv_output.parent
+    return results_base / safe_config_name / safe_run_name / safe_variant

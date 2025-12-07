@@ -136,7 +136,7 @@ Each config (`projects/<project>/configs/*.yml`) defines:
 - **schema**: Schema settings (e.g., `fresh` to drop and recreate the database)
 - **data**: Data load settings (e.g., `load_method` for inserting data via HTTP)
 - **workload**: Defines the workload with concurrency, duration, query parameters, and query selection
-- **metrics**: Defines which metrics to collect, and where to output them
+- **metrics**: Defines which metrics to collect, and where to output them (workload CSV/MD plus a data-load CSV)
 
 ### Example configuration file:
 
@@ -189,6 +189,7 @@ metrics:
   query_log_wait_seconds: 10
   output_csv: "results/baseline_variant_a.csv"
   output_md:  "results/baseline_variant_a.md"
+  data_output_csv: "results/baseline_data_load.csv"
 ```
 
 ## Comparing Results
@@ -265,4 +266,3 @@ python -m harness.cli full-run --config projects/default/configs/example_basic.y
 ## Conclusion
 
 This ClickHouse Benchmarking Harness provides a flexible and scalable approach for performance testing across multiple variants and configurations. With clear isolation between variants and results, and automated reporting, this tool allows for streamlined benchmarking and comparative analysis.
-

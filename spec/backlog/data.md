@@ -1,0 +1,1 @@
+- Currently data is load fresh for eachrun, eachconfig and each variant. Thi sis fine for smaller datasets but becomes an overhead for big ones. Perhaps we can consider a load once scenario at the project level and then the per run load becomes a insert into blah select blah from projectable

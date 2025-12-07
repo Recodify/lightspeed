@@ -1,0 +1,2 @@
+- Would be nice to include a command in the cli to scaffold a new project, adding all the dir structures, example config ect.
+-

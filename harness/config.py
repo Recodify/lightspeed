@@ -76,13 +76,13 @@ class WorkloadConfig(BaseModel):
     name: str = "workload"
     path: str = "baseline"
     queries: list[QuerySpec] | None = None  # None means auto-discover
-    concurrency: int = Field(ge=1, default=4)  # 4 concurrent workers by default
-    duration_seconds: int = Field(ge=1, default=60)  # 60 second runs by default
+    concurrency: int = Field(ge=1, default=1)  # 4 concurrent workers by default
+    duration_seconds: int = Field(ge=1, default=10)
     ramp_up_seconds: int = Field(ge=0, default=0)
     warmup_queries: int = Field(ge=0, default=0)
     think_time_ms: int = Field(ge=0, default=0)
     max_errors: int = Field(ge=0, default=100)
-    query_timeout_seconds: int = Field(ge=1, default=60)
+    query_timeout_seconds: int = Field(ge=1, default=5)
     parameters: dict[str, ParameterSpec] | None = None
 
 
@@ -93,6 +93,7 @@ class MetricsConfig(BaseModel):
     query_log_wait_seconds: int = Field(ge=0, default=10)
     output_csv: str = "results/results.csv"
     output_md: str = "results/results.md"
+    data_output_csv: str = "results/data_load.csv"
 
 
 class VariantConfig(BaseModel):
