@@ -84,7 +84,7 @@ def collect_query_log_metrics(
         ORDER BY event_time DESC
     """
 
-    logger.info(f"collecting query logs. query: {sql}")
+    logger.debug(f"collecting query logs. query: {sql}")
 
     try:
         results = client.execute(sql)

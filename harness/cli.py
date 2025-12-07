@@ -22,7 +22,7 @@ from harness.exceptions import HarnessError
 from harness.metrics_collector import collect_query_log_metrics
 from harness.reporter import generate_reports, generate_data_load_reports
 from harness.schema_loader import apply_schema
-from harness.utils import setup_logging
+from harness.utils import setup_logging, sanitize_name
 from harness.workload_runner import run_workload
 
 logger = logging.getLogger(__name__)
@@ -55,6 +55,18 @@ def generate_run_name(base_path: Path, user_run_name: str | None = None) -> str:
             break
 
     return run_name
+
+
+def compute_run_dir(config, project_root: Path, config_name: str, run_name: str) -> Path:
+    """Compute the run directory path used by reporter for a variant."""
+    csv_output = Path(config.metrics.output_csv)
+    results_base = project_root / csv_output.parent
+
+    safe_config_name = sanitize_name(config_name)
+    safe_run_name = sanitize_name(run_name)
+    safe_variant = sanitize_name(config.variant)
+
+    return results_base / safe_config_name / safe_run_name / safe_variant
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
@@ -307,6 +319,8 @@ def cmd_full_run(args: argparse.Namespace) -> int:
             # No variants in config, use default
             variants_to_run = ["default"]
 
+        run_results: list[tuple[str, Path]] = []
+
         # Run each variant
         for variant_name in variants_to_run:
             # Resolve variant
@@ -389,10 +403,29 @@ def cmd_full_run(args: argparse.Namespace) -> int:
                 data_load_metrics=data_load_metrics,
             )
 
+            # Track result CSV for later comparisons
+            run_dir = compute_run_dir(config, project_root, config_name, run_name)
+            result_csv = run_dir / Path(config.metrics.output_csv).name
+            run_results.append((variant_name, result_csv))
+
             logger.info("=" * 60)
             logger.info(f"Benchmark completed: {config.variant}")
             logger.info(f"Results: projects/{config.project}/results/{config_name}/{run_name}/{config.variant}/")
             logger.info("=" * 60)
+
+        # Perform comparisons when multiple variants are run
+        if len(run_results) > 1:
+            baseline_variant, baseline_csv = run_results[0]
+            comparison_root = baseline_csv.parent.parent  # .../<config>/<run>/
+            for variant, csv_path in run_results[1:]:
+                comparison_name = f"comparison_{sanitize_name(baseline_variant)}_vs_{sanitize_name(variant)}.md"
+                output_path = comparison_root / comparison_name
+                try:
+                    compare_results(str(baseline_csv), str(csv_path), str(output_path))
+                    rel_out = output_path.relative_to(project_root.parent.parent)
+                    logger.info(f"Comparison complete: {rel_out}")
+                except Exception as e:
+                    logger.error(f"Comparison failed for {baseline_variant} vs {variant}: {e}")
 
         # All variants completed successfully
         return 0

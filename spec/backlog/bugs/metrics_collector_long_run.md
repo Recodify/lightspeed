@@ -22,3 +22,5 @@ in metrics_collector we currently do:
 
 this works fine if the number of query_ids is below a certain threshold. Works for for say 4 concurrent works on a 10 second duration.
 However if we increase duration to 60seconds, there are so many query ids, that clickhouse throws a 400, when we execute the above query.
+
+perhaps we should modify the queryid we're generating to allow a where queryId like %blah% rather than using an in (queryids)
