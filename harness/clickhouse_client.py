@@ -53,6 +53,23 @@ class ClickHouseClient:
             f"timeout={timeout}s, pool_size={config.connection_pool_size}"
         )
 
+    def _raise_for_status(self, response: httpx.Response) -> None:
+        """Raise with enriched context and redacted URL."""
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            safe_url = str(exc.request.url)
+            if self.config.password:
+                safe_url = safe_url.replace(f"password={self.config.password}", "password=***")
+            body_preview = response.text[:500]
+            logger.error(
+                "ClickHouse HTTP error %s for %s: %s",
+                response.status_code,
+                safe_url,
+                body_preview or "<empty response body>",
+            )
+            raise
+
     def execute(
         self,
         sql: str,
@@ -90,7 +107,7 @@ class ClickHouseClient:
             content=sql,
             headers={"Content-Type": "text/plain"}
         )
-        response.raise_for_status()
+        self._raise_for_status(response)
 
         # Parse JSON response
         result = response.json()
@@ -126,7 +143,7 @@ class ClickHouseClient:
             content=sql,
             headers={"Content-Type": "text/plain"}
         )
-        response.raise_for_status()
+        self._raise_for_status(response)
 
     def insert_stream(
         self,
@@ -166,7 +183,7 @@ class ClickHouseClient:
             content=file_handle,
             headers={"Content-Type": "application/octet-stream"}
         )
-        response.raise_for_status()
+        self._raise_for_status(response)
 
     def test_connection(self) -> bool:
         """Test ClickHouse connection.
@@ -189,7 +206,7 @@ class ClickHouseClient:
                 content="SELECT 1 FORMAT JSON",
                 headers={"Content-Type": "text/plain"}
             )
-            response.raise_for_status()
+            self._raise_for_status(response)
             result = response.json()
             return len(result.get("data", [])) > 0
         except Exception as e:

@@ -6,6 +6,7 @@ import random
 import threading
 import time
 import uuid
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
@@ -483,6 +484,14 @@ def run_workload(
 
     # Check if error threshold exceeded
     if error_counter.value >= config.workload.max_errors:
+        # Summarize top error messages to aid debugging
+        error_messages = [r.error_message for r in all_records if not r.success and r.error_message]
+        if error_messages:
+            counts = Counter(error_messages)
+            logger.error("Top errors (count: message):")
+            for message, count in counts.most_common(5):
+                logger.error(f"  {count}: {message}")
+
         raise WorkloadAbortedError(
             f"Workload aborted: error count {error_counter.value} "
             f"exceeded threshold {config.workload.max_errors}"
