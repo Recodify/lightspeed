@@ -84,8 +84,17 @@ def generate_reports(
             "avg_memory_usage": avg_memory_usage,
         })
 
+    # Generate output paths with variant name inserted
+    # Replace the filename to include variant: results/foo.csv -> results/foo_variant.csv
+    csv_output = Path(config.metrics.output_csv)
+    csv_filename = f"{csv_output.stem}_{config.variant}{csv_output.suffix}"
+    csv_path = project_root / csv_output.parent / csv_filename
+
+    md_output = Path(config.metrics.output_md)
+    md_filename = f"{md_output.stem}_{config.variant}{md_output.suffix}"
+    md_path = project_root / md_output.parent / md_filename
+
     # Generate CSV report
-    csv_path = project_root / config.metrics.output_csv
     _generate_csv_report(
         csv_path,
         query_stats,
@@ -94,7 +103,6 @@ def generate_reports(
     )
 
     # Generate Markdown report
-    md_path = project_root / config.metrics.output_md
     _generate_markdown_report(
         md_path,
         query_stats,

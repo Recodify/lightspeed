@@ -1,0 +1,21 @@
+event_id,user_id,event_type,event_time,properties
+1,101,login,2024-01-01 10:00:00,{"browser":"chrome"}
+2,102,click,2024-01-01 10:01:00,{"page":"home"}
+3,101,view,2024-01-01 10:02:00,{"product_id":"A123"}
+4,103,login,2024-01-01 10:03:00,{"browser":"firefox"}
+5,102,purchase,2024-01-01 10:04:00,{"amount":99.99}
+6,101,logout,2024-01-01 10:05:00,{}
+7,104,login,2024-01-01 10:06:00,{"browser":"safari"}
+8,103,click,2024-01-01 10:07:00,{"page":"products"}
+9,104,view,2024-01-01 10:08:00,{"product_id":"B456"}
+10,102,click,2024-01-01 10:09:00,{"page":"checkout"}
+11,105,login,2024-01-01 10:10:00,{"browser":"edge"}
+12,103,purchase,2024-01-01 10:11:00,{"amount":149.99"}
+13,104,logout,2024-01-01 10:12:00,{}
+14,105,view,2024-01-01 10:13:00,{"product_id":"C789"}
+15,101,login,2024-01-01 10:14:00,{"browser":"chrome"}
+16,102,logout,2024-01-01 10:15:00,{}
+17,106,login,2024-01-01 10:16:00,{"browser":"chrome"}
+18,105,click,2024-01-01 10:17:00,{"page":"cart"}
+19,106,view,2024-01-01 10:18:00,{"product_id":"D012"}
+20,103,logout,2024-01-01 10:19:00,{}
