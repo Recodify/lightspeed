@@ -7,3 +7,8 @@
 - when a step has been implented:
   - ensure tasklist is updated.
   - git add and git commit with a good commit message, never include an attributions
+
+# General
+
+- this is a greenfield project in sprint 0, so all changes should be consider canonical with no need for
+legacy support/backward compatibility
