@@ -6,6 +6,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from coolname import generate_slug
+
 from harness.clickhouse_client import ClickHouseClient
 from harness.comparator import compare_results
 from harness.config import (
@@ -24,6 +26,35 @@ from harness.utils import setup_logging
 from harness.workload_runner import run_workload
 
 logger = logging.getLogger(__name__)
+
+
+def generate_run_name(base_path: Path, user_run_name: str | None = None) -> str:
+    """Generate or validate a unique run name.
+
+    Args:
+        base_path: Base directory for results (e.g., projects/default/results/)
+        user_run_name: Optional user-specified run name
+
+    Returns:
+        Run name (either user-specified or auto-generated)
+    """
+    if user_run_name is not None:
+        # Use user-specified name as-is
+        return user_run_name
+
+    # Generate a 2-part memorable name (adjective-noun)
+    run_name = generate_slug(2)
+
+    # Handle the rare collision by generating a new name
+    attempt = 1
+    while (base_path / run_name).exists():
+        run_name = generate_slug(2)
+        attempt += 1
+        if attempt > 5:  # After 5 attempts, append a number
+            run_name = f"{run_name}-{attempt}"
+            break
+
+    return run_name
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
@@ -152,6 +183,12 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
         project_root = compute_project_root(config)
         variant_root = compute_variant_root(config)
 
+        # Generate or use specified run name
+        results_base = project_root / "results"
+        run_name = generate_run_name(results_base, args.run_name if hasattr(args, 'run_name') else None)
+
+        logger.info(f"Run: {run_name}")
+
         logger.debug("Running workload...")
         workload_result = run_workload(config, project_root, variant_root)
 
@@ -179,7 +216,7 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
                 end_time,
             )
 
-        # Generate reports
+        # Generate reports with run_name
         logger.debug("Generating reports...")
         generate_reports(
             config,
@@ -187,8 +224,10 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
             query_log_metrics,
             workload_metadata,
             project_root,
+            run_name,
         )
 
+        logger.info(f"Results: projects/{config.project}/results/{run_name}/{config.variant}/")
         logger.debug("Workload execution and reporting complete")
         return 0
 
@@ -212,6 +251,13 @@ def cmd_full_run(args: argparse.Namespace) -> int:
     try:
         logger.debug(f"Loading configuration from {args.config}")
         base_config = load_config(args.config)
+
+        # Generate or use specified run name
+        project_root = compute_project_root(base_config)
+        results_base = project_root / "results"
+        run_name = generate_run_name(results_base, args.run_name if hasattr(args, 'run_name') else None)
+
+        logger.info(f"Run: {run_name}")
 
         # Determine which variants to run
         # If --variant is explicitly provided, run only that variant
@@ -268,13 +314,51 @@ def cmd_full_run(args: argparse.Namespace) -> int:
 
             # Step 4: Run workload
             logger.info("[4/4] Running workload...")
-            if cmd_run_workload(args) != 0:
-                logger.error("Workload execution failed, aborting")
-                return 1
+
+            # Run workload inline to pass run_name to reporter
+            variant_root = compute_variant_root(config)
+
+            logger.debug("Running workload...")
+            workload_result = run_workload(config, project_root, variant_root)
+
+            execution_records = workload_result["records"]
+            workload_metadata = {
+                "workload_start_epoch_ms": workload_result["workload_start_epoch_ms"],
+                "workload_end_epoch_ms": workload_result["workload_end_epoch_ms"],
+                "workload_elapsed_secs": workload_result["workload_elapsed_secs"],
+            }
+
+            logger.debug(f"Workload completed: {len(execution_records)} queries executed")
+
+            # Convert epoch milliseconds to datetime for metrics collection
+            start_time = datetime.fromtimestamp(workload_result["workload_start_epoch_ms"] / 1000)
+            end_time = datetime.fromtimestamp(workload_result["workload_end_epoch_ms"] / 1000)
+
+            # Collect metrics from query_log
+            logger.debug("Collecting metrics from query_log...")
+            with ClickHouseClient(config.clickhouse) as client:
+                query_log_metrics = collect_query_log_metrics(
+                    config,
+                    client,
+                    execution_records,
+                    start_time,
+                    end_time,
+                )
+
+            # Generate reports with run_name
+            logger.debug("Generating reports...")
+            generate_reports(
+                config,
+                execution_records,
+                query_log_metrics,
+                workload_metadata,
+                project_root,
+                run_name,
+            )
 
             logger.info("=" * 60)
             logger.info(f"Benchmark completed: {config.variant}")
-            logger.info(f"Results: projects/{config.project}/results/results_{config.variant}.csv")
+            logger.info(f"Results: projects/{config.project}/results/{run_name}/{config.variant}/")
             logger.info("=" * 60)
 
         # All variants completed successfully
@@ -365,6 +449,12 @@ def main() -> int:
     parser_run_workload.add_argument("--config", type=str, required=True, help="Path to configuration YAML file")
     parser_run_workload.add_argument("--variant", type=str, default="default", help="Variant to run (default: default)")
     parser_run_workload.add_argument("--verbose", action="store_true", help="Enable verbose logging (DEBUG level)")
+    parser_run_workload.add_argument(
+        "--run-name",
+        type=str,
+        default=None,
+        help="Specify a name for this run (e.g., 'baseline-v1'). If not provided, generates a memorable name like 'brave-penguin'",
+    )
 
     # full-run command
     parser_full_run = subparsers.add_parser(
@@ -378,6 +468,12 @@ def main() -> int:
         "--dry-run",
         action="store_true",
         help="Dry-run mode: validate only, don't execute",
+    )
+    parser_full_run.add_argument(
+        "--run-name",
+        type=str,
+        default=None,
+        help="Specify a name for this run (e.g., 'baseline-v1'). If not provided, generates a memorable name like 'brave-penguin'",
     )
 
     # compare command

@@ -18,7 +18,8 @@ def generate_reports(
     execution_records: list[ExecutionRecord],
     query_log_metrics: dict[str, dict],
     workload_metadata: dict,
-    project_root: Path
+    project_root: Path,
+    run_name: str
 ) -> None:
     """Generate CSV and Markdown reports from benchmark results.
 
@@ -31,6 +32,7 @@ def generate_reports(
             - workload_end_epoch_ms: Workload end time in milliseconds
             - workload_elapsed_secs: Actual workload duration in seconds
         project_root: Project root directory for output files
+        run_name: Run name for result isolation (e.g., 'brave-penguin')
     """
     logger.debug("Generating benchmark reports...")
 
@@ -84,15 +86,14 @@ def generate_reports(
             "avg_memory_usage": avg_memory_usage,
         })
 
-    # Generate output paths with variant name inserted
-    # Replace the filename to include variant: results/foo.csv -> results/foo_variant.csv
+    # Generate output paths: results/{run_name}/{variant}/results.csv
     csv_output = Path(config.metrics.output_csv)
-    csv_filename = f"{csv_output.stem}_{config.variant}{csv_output.suffix}"
-    csv_path = project_root / csv_output.parent / csv_filename
-
     md_output = Path(config.metrics.output_md)
-    md_filename = f"{md_output.stem}_{config.variant}{md_output.suffix}"
-    md_path = project_root / md_output.parent / md_filename
+
+    results_base = project_root / csv_output.parent
+    run_dir = results_base / run_name / config.variant
+    csv_path = run_dir / csv_output.name
+    md_path = run_dir / md_output.name
 
     # Generate CSV report
     _generate_csv_report(
