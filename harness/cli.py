@@ -314,24 +314,22 @@ def cmd_full_run(args: argparse.Namespace) -> int:
 
             # Step 1: Validate
             logger.info("[1/4] Validating configuration...")
-            if cmd_validate(args) != 0:
-                logger.error("Validation failed, aborting")
-                return 1
+            validate_config(config)
 
             # Step 2: Initialize database if fresh schema requested
             if config.schema.fresh:
                 logger.info("[2/4] Initializing database (fresh schema)...")
-                if cmd_init_db(args) != 0:
-                    logger.error("Schema initialization failed, aborting")
-                    return 1
+                variant_root = compute_variant_root(config)
+                with ClickHouseClient(config.clickhouse) as client:
+                    apply_schema(config, client, project_root, variant_root, run_name, config_name)
             else:
                 logger.info("[2/4] Skipping schema initialization (fresh=False)")
 
             # Step 3: Load data
             logger.info("[3/4] Loading data...")
-            if cmd_load_data(args) != 0:
-                logger.error("Data loading failed, aborting")
-                return 1
+            variant_root = compute_variant_root(config)
+            with ClickHouseClient(config.clickhouse) as client:
+                load_data(config, client, project_root, variant_root, run_name, config_name)
 
             # Step 4: Run workload
             logger.info("[4/4] Running workload...")
