@@ -472,12 +472,13 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
 
 **File:** `README.md`
 
-- [ ] Overview and features
-- [ ] Installation instructions
-- [ ] Quick start guide
-- [ ] Configuration reference
-- [ ] CLI command examples
-- [ ] Project structure explanation
+- [x] Overview and features
+- [x] Thesis - clickhouse is all about schema and gives you more choices than most dbms, this tool is needed etc.
+- [x] Installation instructions
+- [x] Quick start guide, including minimum viable config.
+- [x] Configuration reference
+- [x] CLI command examples
+- [x] Project structure explanation
 
 ---
 
