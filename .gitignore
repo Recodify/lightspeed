@@ -4,4 +4,6 @@ coverage/
 __pycache__/
 results/
 readme.local.md
-projects/*-local
+projects/*local
+harness/tools
+spec/prompts
