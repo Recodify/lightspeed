@@ -248,3 +248,390 @@ def compare_results(csv_a_path: str, csv_b_path: str, output_path: str) -> None:
         f.write("- **+∞**: Baseline value was zero\n")
 
     logger.info(f"Comparison report written to {output_path}")
+
+
+def compare_all_variants(variant_results: list[tuple[str, str]], output_path: str) -> None:
+    """Compare N benchmark variants and generate comprehensive comparison report.
+
+    Args:
+        variant_results: List of (variant_name, results_path) tuples
+        output_path: Path for output Markdown comparison report
+
+    Raises:
+        FileNotFoundError: If any results file doesn't exist
+        ValueError: If results files have invalid format or less than 2 variants
+    """
+    logger.info(f"Comparing {len(variant_results)} variants")
+
+    # Validation
+    if len(variant_results) < 2:
+        raise ValueError("N-way comparison requires at least 2 variants")
+
+    # Load all results
+    all_data = {}
+    for variant_name, result_path in variant_results:
+        df = _load_results(result_path)
+        all_data[variant_name] = df
+        logger.debug(f"Loaded {len(df)} queries for variant '{variant_name}'")
+
+    # Build unified query list (union of all queries)
+    all_queries = set()
+    for df in all_data.values():
+        all_queries.update(df['query_name'].tolist())
+    all_queries = sorted(all_queries)
+
+    logger.debug(f"Found {len(all_queries)} unique queries across all variants")
+
+    # For each query, aggregate metrics from all variants
+    comparison_data = []
+    for query_name in all_queries:
+        query_comparison = _compare_query_across_variants(query_name, all_data)
+        comparison_data.append(query_comparison)
+
+    # Calculate rankings
+    rankings = _calculate_rankings(comparison_data, [v[0] for v in variant_results])
+
+    # Determine overall winner
+    winner_summary = _determine_overall_winner(comparison_data, [v[0] for v in variant_results])
+
+    # Generate Markdown report
+    _generate_nway_report(
+        output_path,
+        variant_results,
+        comparison_data,
+        rankings,
+        winner_summary
+    )
+
+    logger.info(f"N-way comparison report written to {output_path}")
+
+
+def _compare_query_across_variants(
+    query_name: str,
+    all_data: dict[str, pd.DataFrame]
+) -> dict:
+    """Compare single query across all variants.
+
+    Args:
+        query_name: Name of the query to compare
+        all_data: Dictionary mapping variant_name to DataFrame with results
+
+    Returns:
+        Dictionary with query metrics across all variants plus best variant per metric
+    """
+    metrics = {
+        'p50_ms': {},
+        'p95_ms': {},
+        'p99_ms': {},
+        'avg_query_duration_ms': {},
+        'qps': {},
+        'avg_read_rows': {},
+        'avg_read_bytes': {},
+        'avg_memory_usage': {},
+        'error_rate': {},
+    }
+
+    variants_with_query = []
+
+    # Collect metrics from each variant
+    for variant_name, df in all_data.items():
+        query_rows = df[df['query_name'] == query_name]
+        if len(query_rows) == 0:
+            continue  # Query doesn't exist in this variant
+
+        variants_with_query.append(variant_name)
+        row = query_rows.iloc[0]
+
+        for metric_name in metrics.keys():
+            if metric_name in row and not pd.isna(row[metric_name]):
+                metrics[metric_name][variant_name] = row[metric_name]
+
+    # Determine best variant for each metric
+    best_variant = {}
+    for metric_name, variant_values in metrics.items():
+        if not variant_values:
+            continue
+
+        if metric_name == 'qps':  # Higher is better
+            best_value = max(variant_values.values())
+            # Handle ties - list all winners
+            best_variant[metric_name] = [k for k, v in variant_values.items() if v == best_value]
+        else:  # Lower is better
+            best_value = min(variant_values.values())
+            # Handle ties - list all winners
+            best_variant[metric_name] = [k for k, v in variant_values.items() if v == best_value]
+
+    return {
+        'query_name': query_name,
+        'variants_with_query': variants_with_query,
+        'metrics': metrics,
+        'best_variant': best_variant
+    }
+
+
+def _calculate_rankings(
+    comparison_data: list[dict],
+    all_variants: list[str]
+) -> dict:
+    """Calculate rankings for each key metric.
+
+    Returns ranking of variants by average p50, p95, and qps across all queries.
+    """
+    # Aggregate metrics per variant
+    variant_metrics = {v: {'p50': [], 'p95': [], 'qps': []} for v in all_variants}
+
+    for query_comp in comparison_data:
+        for metric_key, result_key in [
+            ('p50_ms', 'p50'),
+            ('p95_ms', 'p95'),
+            ('qps', 'qps')
+        ]:
+            for variant, value in query_comp['metrics'][metric_key].items():
+                variant_metrics[variant][result_key].append(value)
+
+    # Calculate averages and rank
+    rankings = {}
+    for metric in ['p50', 'p95', 'qps']:
+        ranked = []
+        for variant in all_variants:
+            values = variant_metrics[variant][metric]
+            if values:
+                avg_value = sum(values) / len(values)
+                ranked.append((variant, avg_value))
+
+        # Sort: ascending for latency, descending for throughput
+        reverse = (metric == 'qps')
+        ranked.sort(key=lambda x: x[1], reverse=reverse)
+        rankings[f'by_{metric}'] = ranked
+
+    return rankings
+
+
+def _determine_overall_winner(
+    comparison_data: list[dict],
+    all_variants: list[str]
+) -> dict:
+    """Determine overall winner based on per-query wins.
+
+    Returns summary with overall winner and win counts per variant.
+    """
+    wins_per_variant = {v: 0 for v in all_variants}
+
+    # Count wins per variant (using p50 as primary metric)
+    for query_comp in comparison_data:
+        best_variants = query_comp['best_variant'].get('p50_ms', [])
+        if best_variants:
+            # If tie, award win to all tied variants
+            for variant in best_variants:
+                if variant in wins_per_variant:
+                    wins_per_variant[variant] += 1
+
+    # Find overall winner (variant with most wins)
+    if wins_per_variant:
+        overall_winner = max(wins_per_variant.items(), key=lambda x: x[1])[0]
+    else:
+        overall_winner = "N/A"
+
+    return {
+        'overall_winner': overall_winner,
+        'wins_per_variant': wins_per_variant,
+    }
+
+
+def _generate_nway_report(
+    output_path: str,
+    variant_results: list[tuple[str, str]],
+    comparison_data: list[dict],
+    rankings: dict,
+    winner_summary: dict
+) -> None:
+    """Generate comprehensive N-way comparison Markdown report."""
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_path, 'w') as f:
+        # Header
+        f.write("# N-Way Benchmark Comparison\n\n")
+
+        # Metadata table
+        _write_metadata_table(f, variant_results)
+
+        # Executive summary
+        _write_executive_summary(f, winner_summary)
+
+        # Section 1: Side-by-side comparison
+        f.write("## Section 1: Side-by-Side Performance Comparison\n\n")
+        for query_comp in comparison_data:
+            _write_query_comparison_table(f, query_comp, variant_results)
+
+        # Section 2: Rankings
+        f.write("## Section 2: Rankings\n\n")
+        _write_rankings(f, rankings)
+
+        # Interpretation guide
+        _write_interpretation_guide(f)
+
+
+def _write_metadata_table(f, variant_results):
+    """Write variants metadata table."""
+    f.write(f"**Variants Compared**: {len(variant_results)} variants\n\n")
+    f.write("| Variant | Results Path |\n")
+    f.write("|---------|--------------|\n")
+    for variant_name, result_path in variant_results:
+        f.write(f"| {variant_name} | `{result_path}` |\n")
+    f.write("\n---\n\n")
+
+
+def _write_executive_summary(f, winner_summary):
+    """Write executive summary section."""
+    f.write("## Executive Summary\n\n")
+    f.write(f"**Overall Winner**: {winner_summary['overall_winner']}\n\n")
+    f.write("**Win Distribution** (based on p50 latency):\n")
+    total_wins = sum(winner_summary['wins_per_variant'].values())
+    for variant, wins in sorted(
+        winner_summary['wins_per_variant'].items(),
+        key=lambda x: x[1],
+        reverse=True
+    ):
+        pct = (wins / total_wins * 100) if total_wins > 0 else 0
+        f.write(f"- {variant}: {wins} queries ({pct:.1f}%)\n")
+    f.write("\n---\n\n")
+
+
+def _write_query_comparison_table(f, query_comp, variant_results):
+    """Write side-by-side comparison table for single query."""
+    query_name = query_comp['query_name']
+    variants_with_query = query_comp['variants_with_query']
+    all_variants = [v[0] for v in variant_results]
+
+    f.write(f"### Query: {query_name}\n")
+    f.write(f"*(Available in: {', '.join(variants_with_query)})*\n\n")
+
+    # Table header
+    header = "| Metric |"
+    for variant in all_variants:
+        header += f" {variant} |"
+    header += " Best |"
+    for variant in all_variants:
+        header += f" Δ ({variant}) |"
+    f.write(header + "\n")
+
+    # Table separator
+    sep = "|--------|"
+    for _ in all_variants:
+        sep += "----------|"
+    sep += "------|"
+    for _ in all_variants:
+        sep += "------------------|"
+    f.write(sep + "\n")
+
+    # Metrics rows
+    metric_display = [
+        ('p50_ms', 'p50 (ms)', 'lower'),
+        ('p95_ms', 'p95 (ms)', 'lower'),
+        ('avg_query_duration_ms', 'Avg (ms)', 'lower'),
+        ('qps', 'QPS', 'higher'),
+    ]
+
+    for metric_key, metric_label, direction in metric_display:
+        row = f"| {metric_label} |"
+
+        # Variant values
+        variant_vals = {}
+        for variant in all_variants:
+            val = query_comp['metrics'][metric_key].get(variant)
+            if val is None:
+                row += " N/A |"
+                variant_vals[variant] = None
+            else:
+                row += f" {val:.2f} |"
+                variant_vals[variant] = val
+
+        # Best performer(s)
+        best_variants = query_comp['best_variant'].get(metric_key, [])
+        if not best_variants:
+            row += " N/A |"
+            best_val = None
+        else:
+            row += f" {', '.join(best_variants)} |"
+            # Get best value from first best variant
+            best_val = variant_vals.get(best_variants[0])
+
+        # Delta from best for each variant
+        for variant in all_variants:
+            val = variant_vals[variant]
+            if val is None:
+                row += " N/A |"
+            elif best_val is None or variant in best_variants:
+                row += " - |"
+            else:
+                delta_pct = ((val - best_val) / best_val) * 100
+                row += f" {delta_pct:+.1f}% |"
+
+        f.write(row + "\n")
+
+    # Winner line
+    best_for_query = query_comp['best_variant'].get('p50_ms', [])
+    winner_text = ', '.join(best_for_query) if best_for_query else 'N/A'
+    f.write(f"\n**Winner for this query**: {winner_text}\n\n")
+    f.write("---\n\n")
+
+
+def _write_rankings(f, rankings):
+    """Write rankings section."""
+    ranking_configs = [
+        ('by_p50', 'p50 Latency', 'ms', 'lower'),
+        ('by_p95', 'p95 Latency', 'ms', 'lower'),
+        ('by_qps', 'QPS', 'qps', 'higher'),
+    ]
+
+    for ranking_key, title, unit, direction in ranking_configs:
+        f.write(f"### Ranking by {title} (Average Across All Queries)\n\n")
+        f.write(f"| Rank | Variant | Avg {title}")
+        if unit != 'qps':
+            f.write(f" ({unit})")
+        f.write(" | Relative to Best |\n")
+        f.write("|------|---------|--------------|------------------|\n")
+
+        ranked = rankings[ranking_key]
+        if not ranked:
+            f.write("| - | No data | - | - |\n")
+            f.write("\n")
+            continue
+
+        best_val = ranked[0][1]
+        for rank, (variant, avg_val) in enumerate(ranked, 1):
+            if rank == 1:
+                delta = "-"
+            else:
+                delta_pct = ((avg_val - best_val) / best_val) * 100
+                delta = f"{delta_pct:+.1f}%"
+
+            f.write(f"| {rank} | {variant} | {avg_val:.2f} | {delta} |\n")
+
+        f.write("\n")
+
+
+def _write_interpretation_guide(f):
+    """Write interpretation guide section."""
+    f.write("---\n\n")
+    f.write("## Interpretation Guide\n\n")
+    f.write("### Metrics\n")
+    f.write("- **p50 (ms)**: Median query latency - 50% of queries complete faster\n")
+    f.write("- **p95 (ms)**: 95th percentile latency - only 5% of queries are slower\n")
+    f.write("- **Avg (ms)**: Average query duration across all executions\n")
+    f.write("- **QPS**: Queries per second (throughput)\n\n")
+
+    f.write("### Performance Direction\n")
+    f.write("- **Latency** (p50, p95, Avg): Lower is better\n")
+    f.write("- **Throughput** (QPS): Higher is better\n\n")
+
+    f.write("### Symbols\n")
+    f.write("- **N/A**: Query not available in this variant\n")
+    f.write("- **-**: This variant is the best performer\n")
+    f.write("- **Δ (delta)**: Percentage difference from best performer\n")
+    f.write("  - Positive Δ in latency = slower (worse)\n")
+    f.write("  - Negative Δ in latency = faster (better)\n")
+    f.write("  - Positive Δ in QPS = higher throughput (better)\n")
+    f.write("  - Negative Δ in QPS = lower throughput (worse)\n")

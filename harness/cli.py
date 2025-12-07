@@ -9,7 +9,7 @@ from pathlib import Path
 from coolname import generate_slug
 
 from harness.clickhouse_client import ClickHouseClient
-from harness.comparator import compare_results
+from harness.comparator import compare_results, compare_all_variants
 from harness.config import (
     compute_project_root,
     compute_variant_root,
@@ -415,19 +415,16 @@ def cmd_full_run(args: argparse.Namespace) -> int:
             logger.info(f"Results: projects/{config.project}/results/{config_name}/{run_name}/{config.variant}/")
             logger.info("=" * 60)
 
-        # Perform comparisons when multiple variants are run
+        # Perform N-way comparison when multiple variants are run
         if len(run_results) > 1:
-            baseline_variant, baseline_path = run_results[0]
-            comparison_root = baseline_path.parent.parent  # .../<config>/<run>/
-            for variant, result_path in run_results[1:]:
-                comparison_name = f"comparison_{sanitize_name(baseline_variant)}_vs_{sanitize_name(variant)}.md"
-                output_path = comparison_root / comparison_name
-                try:
-                    compare_results(str(baseline_path), str(result_path), str(output_path))
-                    rel_out = output_path.relative_to(project_root.parent.parent)
-                    logger.info(f"Comparison complete: {rel_out}")
-                except Exception as e:
-                    logger.error(f"Comparison failed for {baseline_variant} vs {variant}: {e}")
+            comparison_root = run_results[0][1].parent.parent  # .../<config>/<run>/
+            output_path = comparison_root / "comparison_all_variants.md"
+            try:
+                compare_all_variants(run_results, str(output_path))
+                rel_out = output_path.relative_to(project_root.parent.parent)
+                logger.info(f"N-way comparison complete: {rel_out}")
+            except Exception as e:
+                logger.error(f"N-way comparison failed: {e}")
 
         # All variants completed successfully
         return 0
