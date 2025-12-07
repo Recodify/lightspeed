@@ -80,38 +80,38 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
 
 ---
 
-### 4. ClickHouse Client
+### 4. ClickHouse Client ✅
 
 **File:** `harness/clickhouse_client.py`
 
-- [ ] Create `ClickHouseClient` class
+- [x] Create `ClickHouseClient` class
   - Constructor: `__init__(config: ClickHouseConfig, timeout_seconds: int)`
   - Build base URL from host and port
   - Create httpx.Client with:
     - `httpx.Timeout` (read=timeout_seconds)
     - `httpx.Limits` (max_connections=connection_pool_size)
 
-- [ ] Implement `execute(sql: str, params: dict | None = None, settings: dict | None = None) -> list[dict]`
+- [x] Implement `execute(sql: str, params: dict | None = None, settings: dict | None = None) -> list[dict]`
   - POST to ClickHouse HTTP interface
   - Include user, password, database in query params
   - Add settings to query params if provided
   - Parse JSON response
   - Return list of row dicts
 
-- [ ] Implement `execute_no_result(sql: str, params: dict | None = None, settings: dict | None = None) -> None`
+- [x] Implement `execute_no_result(sql: str, params: dict | None = None, settings: dict | None = None) -> None`
   - Same as execute but don't parse response
   - Used for DDL, INSERT
 
-- [ ] Implement `insert_stream(table: str, file_handle, fmt: str, settings: dict | None = None) -> None`
+- [x] Implement `insert_stream(table: str, file_handle, fmt: str, settings: dict | None = None) -> None`
   - Build query: `INSERT INTO {table} FORMAT {fmt}`
   - POST with file_handle as body
   - Stream file bytes directly
 
-- [ ] Implement `test_connection() -> bool`
+- [x] Implement `test_connection() -> bool`
   - Execute `SELECT 1`
   - Return True if successful, False otherwise
 
-- [ ] Add context manager support (`__enter__`, `__exit__`) for client cleanup
+- [x] Add context manager support (`__enter__`, `__exit__`) for client cleanup
 
 ---
 
