@@ -67,17 +67,25 @@ def format_duration(ms: float) -> str:
 
 
 def sanitize_name(name: str) -> str:
-    """Sanitize a name for use in ClickHouse identifiers.
+    """Sanitize a name for use in ClickHouse identifiers and file paths.
 
-    Replaces hyphens with underscores and removes other invalid characters.
+    Removes all hyphens, underscores, and whitespace to create a single
+    continuous identifier. This ensures clean separation when combining
+    multiple names with underscores as delimiters.
+
+    Examples:
+        'my-project' -> 'myproject'
+        'test run 1' -> 'testrun1'
+        'brave-penguin' -> 'bravepenguin'
 
     Args:
         name: Name to sanitize
 
     Returns:
-        Sanitized name safe for ClickHouse
+        Sanitized name with all separators removed
     """
-    return name.replace('-', '_')
+    # Remove all hyphens, underscores, and whitespace
+    return name.replace('-', '').replace('_', '').replace(' ', '')
 
 
 def compute_isolated_database_name(project: str, config_name: str, run_name: str, variant_name: str) -> str:

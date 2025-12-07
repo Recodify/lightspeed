@@ -9,6 +9,7 @@ import pandas as pd
 
 from harness.config import BenchmarkConfig
 from harness.workload_runner import ExecutionRecord
+from harness.utils import sanitize_name
 
 logger = logging.getLogger(__name__)
 
@@ -89,11 +90,16 @@ def generate_reports(
         })
 
     # Generate output paths: results/{config_name}/{run_name}/{variant}/results.csv
+    # Sanitize all path components to match database naming
+    safe_config_name = sanitize_name(config_name)
+    safe_run_name = sanitize_name(run_name)
+    safe_variant = sanitize_name(config.variant)
+
     csv_output = Path(config.metrics.output_csv)
     md_output = Path(config.metrics.output_md)
 
     results_base = project_root / csv_output.parent
-    run_dir = results_base / config_name / run_name / config.variant
+    run_dir = results_base / safe_config_name / safe_run_name / safe_variant
     csv_path = run_dir / csv_output.name
     md_path = run_dir / md_output.name
 
