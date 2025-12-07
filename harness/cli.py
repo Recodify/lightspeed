@@ -180,6 +180,10 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
         # Resolve variant
         config = resolve_variant_config(config, args.variant)
 
+        # Extract config name from file path
+        config_path = Path(args.config)
+        config_name = config_path.stem
+
         project_root = compute_project_root(config)
         variant_root = compute_variant_root(config)
 
@@ -216,7 +220,7 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
                 end_time,
             )
 
-        # Generate reports with run_name
+        # Generate reports with run_name and config_name
         logger.debug("Generating reports...")
         generate_reports(
             config,
@@ -225,9 +229,10 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
             workload_metadata,
             project_root,
             run_name,
+            config_name,
         )
 
-        logger.info(f"Results: projects/{config.project}/results/{run_name}/{config.variant}/")
+        logger.info(f"Results: projects/{config.project}/results/{config_name}/{run_name}/{config.variant}/")
         logger.debug("Workload execution and reporting complete")
         return 0
 
@@ -251,6 +256,10 @@ def cmd_full_run(args: argparse.Namespace) -> int:
     try:
         logger.debug(f"Loading configuration from {args.config}")
         base_config = load_config(args.config)
+
+        # Extract config name from file path (e.g., "example_basic" from "example_basic.yml")
+        config_path = Path(args.config)
+        config_name = config_path.stem
 
         # Generate or use specified run name
         project_root = compute_project_root(base_config)
@@ -345,7 +354,7 @@ def cmd_full_run(args: argparse.Namespace) -> int:
                     end_time,
                 )
 
-            # Generate reports with run_name
+            # Generate reports with run_name and config_name
             logger.debug("Generating reports...")
             generate_reports(
                 config,
@@ -354,11 +363,12 @@ def cmd_full_run(args: argparse.Namespace) -> int:
                 workload_metadata,
                 project_root,
                 run_name,
+                config_name,
             )
 
             logger.info("=" * 60)
             logger.info(f"Benchmark completed: {config.variant}")
-            logger.info(f"Results: projects/{config.project}/results/{run_name}/{config.variant}/")
+            logger.info(f"Results: projects/{config.project}/results/{config_name}/{run_name}/{config.variant}/")
             logger.info("=" * 60)
 
         # All variants completed successfully

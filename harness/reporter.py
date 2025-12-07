@@ -19,7 +19,8 @@ def generate_reports(
     query_log_metrics: dict[str, dict],
     workload_metadata: dict,
     project_root: Path,
-    run_name: str
+    run_name: str,
+    config_name: str
 ) -> None:
     """Generate CSV and Markdown reports from benchmark results.
 
@@ -33,6 +34,7 @@ def generate_reports(
             - workload_elapsed_secs: Actual workload duration in seconds
         project_root: Project root directory for output files
         run_name: Run name for result isolation (e.g., 'brave-penguin')
+        config_name: Config file name (e.g., 'example_basic')
     """
     logger.debug("Generating benchmark reports...")
 
@@ -86,12 +88,12 @@ def generate_reports(
             "avg_memory_usage": avg_memory_usage,
         })
 
-    # Generate output paths: results/{run_name}/{variant}/results.csv
+    # Generate output paths: results/{config_name}/{run_name}/{variant}/results.csv
     csv_output = Path(config.metrics.output_csv)
     md_output = Path(config.metrics.output_md)
 
     results_base = project_root / csv_output.parent
-    run_dir = results_base / run_name / config.variant
+    run_dir = results_base / config_name / run_name / config.variant
     csv_path = run_dir / csv_output.name
     md_path = run_dir / md_output.name
 
