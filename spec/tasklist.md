@@ -323,29 +323,30 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
 
 ---
 
-### 11. Comparator
+### 11. Comparator ✅
 
 **File:** `harness/comparator.py`
 
-- [ ] Implement `compare_results(csv_a_path: str, csv_b_path: str, output_path: str)`
+- [x] Implement `compare_results(csv_a_path: str, csv_b_path: str, output_path: str)`
 
-- [ ] Read both CSV files with pandas (skip comment rows)
+- [x] Read both CSV files with pandas (skip comment rows)
 
-- [ ] Join on `query_name`
+- [x] Join on `query_name`
 
-- [ ] For each query, calculate:
+- [x] For each query, calculate:
   - `delta_p50 = ((b_p50 - a_p50) / a_p50) * 100` (handle division by zero)
   - `delta_p95 = ((b_p95 - a_p95) / a_p95) * 100`
   - `delta_qps = ((b_qps - a_qps) / a_qps) * 100`
 
-- [ ] Handle edge cases:
+- [x] Handle edge cases:
   - If baseline is 0: mark as "N/A" or "+∞"
-  - If query exists in only one variant: mark as "missing"
+  - If query exists in only one variant: mark as "new" or "removed"
 
-- [ ] Generate Markdown table:
-  - Columns: Query, A p50, B p50, Δ p50, A QPS, B QPS, Δ QPS
+- [x] Generate Markdown table:
+  - Columns: Query, A p50, B p50, Δ p50, A p95, B p95, Δ p95, A QPS, B QPS, Δ QPS
+  - Added interpretation guide
 
-- [ ] Write to output_path
+- [x] Write to output_path
 
 ---
 
@@ -414,10 +415,10 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
     - Run run-workload
   - Exit with appropriate code
 
-- [ ] Implement `compare` command:
+- [x] Implement `compare` command:
   - Arguments: `csv_a`, `csv_b`, `--output <path>`
   - Run comparator.compare_results()
-  - Exit with appropriate code (deferred - requires Task 11)
+  - Exit with appropriate code
 
 - [x] Add main entrypoint for `python -m harness.cli`
 

@@ -1,0 +1,167 @@
+"""Comparison of benchmark results from different runs."""
+
+import logging
+from pathlib import Path
+
+import pandas as pd
+
+logger = logging.getLogger(__name__)
+
+
+def compare_results(csv_a_path: str, csv_b_path: str, output_path: str) -> None:
+    """Compare two benchmark result CSV files and generate comparison report.
+
+    Args:
+        csv_a_path: Path to first (baseline) CSV results file
+        csv_b_path: Path to second (comparison) CSV results file
+        output_path: Path for output Markdown comparison report
+
+    Raises:
+        FileNotFoundError: If either CSV file doesn't exist
+        ValueError: If CSV files have invalid format
+    """
+    logger.info(f"Comparing results: {csv_a_path} vs {csv_b_path}")
+
+    # Read CSV files, skipping comment lines (lines starting with #)
+    try:
+        df_a = pd.read_csv(csv_a_path, comment='#')
+        df_b = pd.read_csv(csv_b_path, comment='#')
+    except FileNotFoundError as e:
+        logger.error(f"CSV file not found: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Failed to read CSV files: {e}")
+        raise ValueError(f"Invalid CSV format: {e}")
+
+    # Validate required columns
+    required_cols = ['query_name', 'count', 'qps', 'p50_ms', 'p95_ms', 'p99_ms']
+    for col in required_cols:
+        if col not in df_a.columns:
+            raise ValueError(f"Column '{col}' missing from {csv_a_path}")
+        if col not in df_b.columns:
+            raise ValueError(f"Column '{col}' missing from {csv_b_path}")
+
+    # Join on query_name
+    df_merged = pd.merge(
+        df_a,
+        df_b,
+        on='query_name',
+        how='outer',
+        suffixes=('_a', '_b')
+    )
+
+    # Calculate deltas for each query
+    comparisons = []
+    for _, row in df_merged.iterrows():
+        query_name = row['query_name']
+
+        # Check if query exists in both datasets
+        missing_in_a = pd.isna(row.get('count_a'))
+        missing_in_b = pd.isna(row.get('count_b'))
+
+        if missing_in_a:
+            # Query only in B
+            comparisons.append({
+                'query_name': query_name,
+                'a_p50': 'N/A',
+                'b_p50': f"{row['p50_ms_b']:.2f}",
+                'delta_p50': 'new',
+                'a_p95': 'N/A',
+                'b_p95': f"{row['p95_ms_b']:.2f}",
+                'delta_p95': 'new',
+                'a_qps': 'N/A',
+                'b_qps': f"{row['qps_b']:.2f}",
+                'delta_qps': 'new',
+            })
+        elif missing_in_b:
+            # Query only in A
+            comparisons.append({
+                'query_name': query_name,
+                'a_p50': f"{row['p50_ms_a']:.2f}",
+                'b_p50': 'N/A',
+                'delta_p50': 'removed',
+                'a_p95': f"{row['p95_ms_a']:.2f}",
+                'b_p95': 'N/A',
+                'delta_p95': 'removed',
+                'a_qps': f"{row['qps_a']:.2f}",
+                'b_qps': 'N/A',
+                'delta_qps': 'removed',
+            })
+        else:
+            # Query in both - calculate deltas
+            p50_a = row['p50_ms_a']
+            p50_b = row['p50_ms_b']
+            p95_a = row['p95_ms_a']
+            p95_b = row['p95_ms_b']
+            qps_a = row['qps_a']
+            qps_b = row['qps_b']
+
+            # Calculate percentage changes, handling division by zero
+            if p50_a == 0:
+                delta_p50 = '+∞' if p50_b > 0 else '0%'
+            else:
+                delta_p50 = f"{((p50_b - p50_a) / p50_a) * 100:+.2f}%"
+
+            if p95_a == 0:
+                delta_p95 = '+∞' if p95_b > 0 else '0%'
+            else:
+                delta_p95 = f"{((p95_b - p95_a) / p95_a) * 100:+.2f}%"
+
+            if qps_a == 0:
+                delta_qps = '+∞' if qps_b > 0 else '0%'
+            else:
+                delta_qps = f"{((qps_b - qps_a) / qps_a) * 100:+.2f}%"
+
+            comparisons.append({
+                'query_name': query_name,
+                'a_p50': f"{p50_a:.2f}",
+                'b_p50': f"{p50_b:.2f}",
+                'delta_p50': delta_p50,
+                'a_p95': f"{p95_a:.2f}",
+                'b_p95': f"{p95_b:.2f}",
+                'delta_p95': delta_p95,
+                'a_qps': f"{qps_a:.2f}",
+                'b_qps': f"{qps_b:.2f}",
+                'delta_qps': delta_qps,
+            })
+
+    # Generate Markdown report
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_path, 'w') as f:
+        f.write("# Benchmark Comparison\n\n")
+        f.write(f"**Baseline (A):** `{csv_a_path}`\n\n")
+        f.write(f"**Comparison (B):** `{csv_b_path}`\n\n")
+        f.write("## Performance Comparison\n\n")
+
+        # Write table header
+        f.write("| Query | A p50 (ms) | B p50 (ms) | Δ p50 | A p95 (ms) | B p95 (ms) | Δ p95 | A QPS | B QPS | Δ QPS |\n")
+        f.write("|-------|------------|------------|-------|------------|------------|-------|-------|-------|-------|\n")
+
+        # Write table rows
+        for comp in comparisons:
+            f.write(
+                f"| {comp['query_name']} "
+                f"| {comp['a_p50']} "
+                f"| {comp['b_p50']} "
+                f"| {comp['delta_p50']} "
+                f"| {comp['a_p95']} "
+                f"| {comp['b_p95']} "
+                f"| {comp['delta_p95']} "
+                f"| {comp['a_qps']} "
+                f"| {comp['b_qps']} "
+                f"| {comp['delta_qps']} |\n"
+            )
+
+        # Add interpretation guide
+        f.write("\n## Interpretation\n\n")
+        f.write("- **Positive Δ p50/p95**: Latency increased (slower)\n")
+        f.write("- **Negative Δ p50/p95**: Latency decreased (faster)\n")
+        f.write("- **Positive Δ QPS**: Throughput increased (better)\n")
+        f.write("- **Negative Δ QPS**: Throughput decreased (worse)\n")
+        f.write("- **new**: Query only in comparison (B)\n")
+        f.write("- **removed**: Query only in baseline (A)\n")
+        f.write("- **+∞**: Baseline value was zero\n")
+
+    logger.info(f"Comparison report written to {output_path}")

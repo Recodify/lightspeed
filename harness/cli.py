@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from harness.clickhouse_client import ClickHouseClient
+from harness.comparator import compare_results
 from harness.config import (
     compute_project_root,
     compute_variant_root,
@@ -242,6 +243,34 @@ def cmd_full_run(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_compare(args: argparse.Namespace) -> int:
+    """Compare two benchmark result CSV files.
+
+    Args:
+        args: Command-line arguments
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    try:
+        logger.info(f"Comparing {args.csv_a} vs {args.csv_b}")
+
+        compare_results(args.csv_a, args.csv_b, args.output)
+
+        logger.info(f"Comparison complete: {args.output}")
+        return 0
+
+    except FileNotFoundError as e:
+        logger.error(f"File not found: {e}")
+        return 1
+    except ValueError as e:
+        logger.error(f"Invalid CSV file: {e}")
+        return 1
+    except Exception as e:
+        logger.error(f"Unexpected error during comparison: {e}", exc_info=True)
+        return 1
+
+
 def main() -> int:
     """Main entry point for CLI.
 
@@ -303,6 +332,28 @@ def main() -> int:
         help="Dry-run mode: validate only, don't execute",
     )
 
+    # compare command
+    parser_compare = subparsers.add_parser(
+        "compare",
+        help="Compare two benchmark result CSV files",
+    )
+    parser_compare.add_argument(
+        "csv_a",
+        type=str,
+        help="Path to first (baseline) CSV results file",
+    )
+    parser_compare.add_argument(
+        "csv_b",
+        type=str,
+        help="Path to second (comparison) CSV results file",
+    )
+    parser_compare.add_argument(
+        "--output",
+        type=str,
+        required=True,
+        help="Path for output Markdown comparison report",
+    )
+
     # Parse arguments
     args = parser.parse_args()
 
@@ -314,8 +365,8 @@ def main() -> int:
         parser.print_help()
         return 1
 
-    # Check if config is provided (required for all commands)
-    if not args.config:
+    # Check if config is provided (required for all commands except compare)
+    if args.command != "compare" and not args.config:
         logger.error("--config is required")
         parser.print_help()
         return 1
@@ -331,6 +382,8 @@ def main() -> int:
         return cmd_run_workload(args)
     elif args.command == "full-run":
         return cmd_full_run(args)
+    elif args.command == "compare":
+        return cmd_compare(args)
     else:
         logger.error(f"Unknown command: {args.command}")
         return 1
