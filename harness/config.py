@@ -15,20 +15,20 @@ logger = logging.getLogger(__name__)
 class ClickHouseConfig(BaseModel):
     """ClickHouse connection configuration."""
 
-    host: str
-    port: int = Field(ge=1, le=65535)
+    host: str = "localhost"
+    port: int = Field(default=8123, ge=1, le=65535)
     user: str = "default"
     password: str = ""
-    database: str
-    connection_pool_size: int = Field(ge=1, le=1000, default=20)
-    timeout_seconds: int = Field(ge=1, default=300)
+    database: str = "default"
+    connection_pool_size: int = Field(default=20, ge=1, le=1000)
+    timeout_seconds: int = Field(default=300, ge=1)
 
 
 class SchemaConfig(BaseModel):
     """Schema loading configuration."""
 
     fail_on_error: bool = True
-    fresh: bool = False
+    fresh: bool = True
 
 
 class DataLoadEntry(BaseModel):
@@ -44,7 +44,7 @@ class DataConfig(BaseModel):
 
     load_method: str = "http"
     truncate_before_load: bool = False
-    load: list[DataLoadEntry]
+    load: list[DataLoadEntry] = Field(default_factory=list)
 
 
 class QuerySpec(BaseModel):
@@ -73,11 +73,11 @@ class ParameterSpec(BaseModel):
 class WorkloadConfig(BaseModel):
     """Workload execution configuration."""
 
-    name: str
-    path: str
+    name: str = "workload"
+    path: str = "baseline"
     queries: list[QuerySpec] | None = None  # None means auto-discover
-    concurrency: int = Field(ge=1)
-    duration_seconds: int = Field(ge=1)
+    concurrency: int = Field(ge=1, default=4)  # 4 concurrent workers by default
+    duration_seconds: int = Field(ge=1, default=60)  # 60 second runs by default
     ramp_up_seconds: int = Field(ge=0, default=0)
     warmup_queries: int = Field(ge=0, default=0)
     think_time_ms: int = Field(ge=0, default=0)
@@ -91,8 +91,8 @@ class MetricsConfig(BaseModel):
 
     use_query_log: bool = True
     query_log_wait_seconds: int = Field(ge=0, default=10)
-    output_csv: str
-    output_md: str
+    output_csv: str = "results/results.csv"
+    output_md: str = "results/results.md"
 
 
 class VariantConfig(BaseModel):
@@ -115,11 +115,11 @@ class BenchmarkConfig(BaseModel):
 
     project: str
     variant: str = "default"
-    clickhouse: ClickHouseConfig | None = None
-    schema: SchemaConfig | None = None
-    data: DataConfig | None = None
-    workload: WorkloadConfig | None = None
-    metrics: MetricsConfig | None = None
+    clickhouse: ClickHouseConfig = Field(default_factory=ClickHouseConfig)
+    schema: SchemaConfig = Field(default_factory=SchemaConfig)
+    data: DataConfig = Field(default_factory=DataConfig)
+    workload: WorkloadConfig = Field(default_factory=WorkloadConfig)
+    metrics: MetricsConfig = Field(default_factory=MetricsConfig)
     variants: dict[str, VariantConfig] | None = None
 
 

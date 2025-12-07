@@ -1,0 +1,22 @@
+project: barebones
+
+# Project-level defaults (shared across all variants)
+clickhouse:
+  host: localhost
+  port: 8123
+  user: default
+  password: "default"
+
+workload:
+  name: basic_benchmark
+  path: baseline
+
+# Define variants with different data configurations
+variants:
+  default:
+    description: "Baseline configuration with sample data"
+    data:
+      load:
+        - table: events
+          file: sample.csv
+          format: CSVWithNames

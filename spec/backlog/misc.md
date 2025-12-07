@@ -1,2 +1,3 @@
 - Some of the code could do with a refactor.
   -   e.g. comparator.py is one single, pretty chunky, function. Consider refactoring into other functions to reduce cognitive complexity.
+-   currently no metrics around data load time is captured. whislt this isn't the primary focus of the harness, it would be useful as schema variants 100% can impact this
