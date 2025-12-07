@@ -98,15 +98,12 @@ def compare_results(csv_a_path: str, csv_b_path: str, output_path: str) -> None:
         raise ValueError(f"Invalid results format: {e}")
 
     # Validate required columns
-    required_cols = ['query_name', 'count', 'qps', 'p50_ms', 'p95_ms', 'p99_ms']
+    required_cols = ['query_name', 'count', 'qps', 'p50_ms', 'p95_ms', 'p99_ms', 'avg_query_duration_ms']
     for col in required_cols:
         if col not in df_a.columns:
             raise ValueError(f"Column '{col}' missing from {csv_a_path}")
         if col not in df_b.columns:
             raise ValueError(f"Column '{col}' missing from {csv_b_path}")
-
-    # Check for optional avg_query_duration_ms column (for backward compatibility)
-    has_avg_duration = 'avg_query_duration_ms' in df_a.columns and 'avg_query_duration_ms' in df_b.columns
 
     # Join on query_name
     df_merged = pd.merge(
@@ -128,7 +125,7 @@ def compare_results(csv_a_path: str, csv_b_path: str, output_path: str) -> None:
 
         if missing_in_a:
             # Query only in B
-            comp = {
+            comparisons.append({
                 'query_name': query_name,
                 'a_p50': 'N/A',
                 'b_p50': f"{row['p50_ms_b']:.2f}",
@@ -136,18 +133,16 @@ def compare_results(csv_a_path: str, csv_b_path: str, output_path: str) -> None:
                 'a_p95': 'N/A',
                 'b_p95': f"{row['p95_ms_b']:.2f}",
                 'delta_p95': 'new',
+                'a_avg_dur': 'N/A',
+                'b_avg_dur': f"{row['avg_query_duration_ms_b']:.2f}",
+                'delta_avg_dur': 'new',
                 'a_qps': 'N/A',
                 'b_qps': f"{row['qps_b']:.2f}",
                 'delta_qps': 'new',
-            }
-            if has_avg_duration:
-                comp['a_avg_dur'] = 'N/A'
-                comp['b_avg_dur'] = f"{row['avg_query_duration_ms_b']:.2f}"
-                comp['delta_avg_dur'] = 'new'
-            comparisons.append(comp)
+            })
         elif missing_in_b:
             # Query only in A
-            comp = {
+            comparisons.append({
                 'query_name': query_name,
                 'a_p50': f"{row['p50_ms_a']:.2f}",
                 'b_p50': 'N/A',
@@ -155,21 +150,21 @@ def compare_results(csv_a_path: str, csv_b_path: str, output_path: str) -> None:
                 'a_p95': f"{row['p95_ms_a']:.2f}",
                 'b_p95': 'N/A',
                 'delta_p95': 'removed',
+                'a_avg_dur': f"{row['avg_query_duration_ms_a']:.2f}",
+                'b_avg_dur': 'N/A',
+                'delta_avg_dur': 'removed',
                 'a_qps': f"{row['qps_a']:.2f}",
                 'b_qps': 'N/A',
                 'delta_qps': 'removed',
-            }
-            if has_avg_duration:
-                comp['a_avg_dur'] = f"{row['avg_query_duration_ms_a']:.2f}"
-                comp['b_avg_dur'] = 'N/A'
-                comp['delta_avg_dur'] = 'removed'
-            comparisons.append(comp)
+            })
         else:
             # Query in both - calculate deltas
             p50_a = row['p50_ms_a']
             p50_b = row['p50_ms_b']
             p95_a = row['p95_ms_a']
             p95_b = row['p95_ms_b']
+            avg_dur_a = row['avg_query_duration_ms_a']
+            avg_dur_b = row['avg_query_duration_ms_b']
             qps_a = row['qps_a']
             qps_b = row['qps_b']
 
@@ -184,12 +179,17 @@ def compare_results(csv_a_path: str, csv_b_path: str, output_path: str) -> None:
             else:
                 delta_p95 = f"{((p95_b - p95_a) / p95_a) * 100:+.2f}%"
 
+            if avg_dur_a == 0:
+                delta_avg_dur = '+∞' if avg_dur_b > 0 else '0%'
+            else:
+                delta_avg_dur = f"{((avg_dur_b - avg_dur_a) / avg_dur_a) * 100:+.2f}%"
+
             if qps_a == 0:
                 delta_qps = '+∞' if qps_b > 0 else '0%'
             else:
                 delta_qps = f"{((qps_b - qps_a) / qps_a) * 100:+.2f}%"
 
-            comp = {
+            comparisons.append({
                 'query_name': query_name,
                 'a_p50': f"{p50_a:.2f}",
                 'b_p50': f"{p50_b:.2f}",
@@ -197,25 +197,13 @@ def compare_results(csv_a_path: str, csv_b_path: str, output_path: str) -> None:
                 'a_p95': f"{p95_a:.2f}",
                 'b_p95': f"{p95_b:.2f}",
                 'delta_p95': delta_p95,
+                'a_avg_dur': f"{avg_dur_a:.2f}",
+                'b_avg_dur': f"{avg_dur_b:.2f}",
+                'delta_avg_dur': delta_avg_dur,
                 'a_qps': f"{qps_a:.2f}",
                 'b_qps': f"{qps_b:.2f}",
                 'delta_qps': delta_qps,
-            }
-
-            if has_avg_duration:
-                avg_dur_a = row['avg_query_duration_ms_a']
-                avg_dur_b = row['avg_query_duration_ms_b']
-
-                if avg_dur_a == 0:
-                    delta_avg_dur = '+∞' if avg_dur_b > 0 else '0%'
-                else:
-                    delta_avg_dur = f"{((avg_dur_b - avg_dur_a) / avg_dur_a) * 100:+.2f}%"
-
-                comp['a_avg_dur'] = f"{avg_dur_a:.2f}"
-                comp['b_avg_dur'] = f"{avg_dur_b:.2f}"
-                comp['delta_avg_dur'] = delta_avg_dur
-
-            comparisons.append(comp)
+            })
 
     # Generate Markdown report
     output_path = Path(output_path)
@@ -228,44 +216,26 @@ def compare_results(csv_a_path: str, csv_b_path: str, output_path: str) -> None:
         f.write("## Performance Comparison\n\n")
 
         # Write table header
-        if has_avg_duration:
-            f.write("| Query | A p50 (ms) | B p50 (ms) | Δ p50 | A p95 (ms) | B p95 (ms) | Δ p95 | A Avg (ms) | B Avg (ms) | Δ Avg | A QPS | B QPS | Δ QPS |\n")
-            f.write("|-------|------------|------------|-------|------------|------------|-------|------------|------------|-------|-------|-------|-------|\n")
-        else:
-            f.write("| Query | A p50 (ms) | B p50 (ms) | Δ p50 | A p95 (ms) | B p95 (ms) | Δ p95 | A QPS | B QPS | Δ QPS |\n")
-            f.write("|-------|------------|------------|-------|------------|------------|-------|-------|-------|-------|\n")
+        f.write("| Query | A p50 (ms) | B p50 (ms) | Δ p50 | A p95 (ms) | B p95 (ms) | Δ p95 | A Avg (ms) | B Avg (ms) | Δ Avg | A QPS | B QPS | Δ QPS |\n")
+        f.write("|-------|------------|------------|-------|------------|------------|-------|------------|------------|-------|-------|-------|-------|\n")
 
         # Write table rows
         for comp in comparisons:
-            if has_avg_duration:
-                f.write(
-                    f"| {comp['query_name']} "
-                    f"| {comp['a_p50']} "
-                    f"| {comp['b_p50']} "
-                    f"| {comp['delta_p50']} "
-                    f"| {comp['a_p95']} "
-                    f"| {comp['b_p95']} "
-                    f"| {comp['delta_p95']} "
-                    f"| {comp['a_avg_dur']} "
-                    f"| {comp['b_avg_dur']} "
-                    f"| {comp['delta_avg_dur']} "
-                    f"| {comp['a_qps']} "
-                    f"| {comp['b_qps']} "
-                    f"| {comp['delta_qps']} |\n"
-                )
-            else:
-                f.write(
-                    f"| {comp['query_name']} "
-                    f"| {comp['a_p50']} "
-                    f"| {comp['b_p50']} "
-                    f"| {comp['delta_p50']} "
-                    f"| {comp['a_p95']} "
-                    f"| {comp['b_p95']} "
-                    f"| {comp['delta_p95']} "
-                    f"| {comp['a_qps']} "
-                    f"| {comp['b_qps']} "
-                    f"| {comp['delta_qps']} |\n"
-                )
+            f.write(
+                f"| {comp['query_name']} "
+                f"| {comp['a_p50']} "
+                f"| {comp['b_p50']} "
+                f"| {comp['delta_p50']} "
+                f"| {comp['a_p95']} "
+                f"| {comp['b_p95']} "
+                f"| {comp['delta_p95']} "
+                f"| {comp['a_avg_dur']} "
+                f"| {comp['b_avg_dur']} "
+                f"| {comp['delta_avg_dur']} "
+                f"| {comp['a_qps']} "
+                f"| {comp['b_qps']} "
+                f"| {comp['delta_qps']} |\n"
+            )
 
         # Add interpretation guide
         f.write("\n## Interpretation\n\n")
