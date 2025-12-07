@@ -169,11 +169,11 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
 
 ---
 
-### 7. Parameter Generator
+### 7. Parameter Generator ✅
 
 **File:** `harness/parameter_generator.py`
 
-- [ ] Implement `generate_params(param_config: dict | None) -> dict`
+- [x] Implement `generate_params(param_config: dict | None) -> dict`
   - If param_config is None or empty, return empty dict
   - For each parameter:
     - If `type == "random_int"`: `random.randint(min, max)`
