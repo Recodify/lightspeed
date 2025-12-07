@@ -175,8 +175,23 @@ class ClickHouseClient:
             True if connection successful, False otherwise
         """
         try:
-            result = self.execute("SELECT 1")
-            return len(result) > 0
+            # Test connection using system database (always exists)
+            query_params = {
+                "user": self.config.user,
+                "database": "system",  # Use system database for connection test
+            }
+            if self.config.password:
+                query_params["password"] = self.config.password
+
+            response = self.client.post(
+                self.base_url,
+                params=query_params,
+                content="SELECT 1 FORMAT JSON",
+                headers={"Content-Type": "text/plain"}
+            )
+            response.raise_for_status()
+            result = response.json()
+            return len(result.get("data", [])) > 0
         except Exception as e:
             logger.error(f"Connection test failed: {e}")
             return False
