@@ -1,11 +1,13 @@
 """Schema loading for ClickHouse databases."""
 
 import logging
+import re
 from pathlib import Path
 
 from harness.clickhouse_client import ClickHouseClient
 from harness.config import BenchmarkConfig
 from harness.exceptions import SchemaLoadError
+from harness.utils import compute_isolated_database_name
 
 logger = logging.getLogger(__name__)
 
@@ -14,12 +16,18 @@ def apply_schema(
     config: BenchmarkConfig,
     client: ClickHouseClient,
     project_root: Path,
-    variant_root: Path
+    variant_root: Path,
+    run_name: str,
+    config_name: str
 ) -> dict[str, int]:
-    """Apply database schema from SQL files.
+    """Apply database schema from SQL files with isolation.
+
+    Creates an isolated database for this run/variant combination.
+    Database name: [projectName]_[configName]_[runName]_[variantName]
+    Table names: Unchanged from schema files
 
     Executes schema files in order:
-    1. If fresh=True, drop and recreate database
+    1. If fresh=True, drop and recreate isolated database
     2. Execute project-wide schemas (project_root/schemas/*.sql)
     3. Execute variant-specific schemas (variant_root/schemas/*.sql)
 
@@ -28,9 +36,11 @@ def apply_schema(
         client: ClickHouse client
         project_root: Project root directory
         variant_root: Variant root directory
+        run_name: Run name for isolation (e.g., 'brave-penguin')
+        config_name: Config file name (e.g., 'example_basic')
 
     Returns:
-        Summary dict with counts: {"executed": N, "failed": N}
+        Summary dict with counts: {"executed": N, "failed": N, "database": db_name}
 
     Raises:
         SchemaLoadError: If schema execution fails and fail_on_error=True
@@ -38,10 +48,16 @@ def apply_schema(
     executed = 0
     failed = 0
 
+    # Compute isolated database name
+    isolated_database = compute_isolated_database_name(
+        config.project, config_name, run_name, config.variant
+    )
+    logger.info(f"Using isolated database: {isolated_database}")
+
     # Fresh database if requested
     if config.schema.fresh:
         logger.debug("Fresh schema mode: dropping and recreating database")
-        database = config.clickhouse.database
+        database = isolated_database
 
         # For DDL operations, we need to use a database-agnostic connection
         # Create temporary parameters without database specification
@@ -93,7 +109,8 @@ def apply_schema(
 
         for schema_file in schema_files:
             success = _execute_schema_file(
-                schema_file, client, config.schema.fail_on_error, "project"
+                schema_file, client, config.schema.fail_on_error, "project",
+                isolated_database
             )
             executed += 1
             if not success:
@@ -109,7 +126,8 @@ def apply_schema(
 
         for schema_file in schema_files:
             success = _execute_schema_file(
-                schema_file, client, config.schema.fail_on_error, "variant"
+                schema_file, client, config.schema.fail_on_error, "variant",
+                isolated_database
             )
             executed += 1
             if not success:
@@ -120,22 +138,26 @@ def apply_schema(
     # Log summary
     logger.debug(f"Schema loading complete: {executed} executed, {failed} failed")
 
-    return {"executed": executed, "failed": failed}
+    return {"executed": executed, "failed": failed, "database": isolated_database}
 
 
 def _execute_schema_file(
     schema_file: Path,
     client: ClickHouseClient,
     fail_on_error: bool,
-    scope: str
+    scope: str,
+    isolated_database: str
 ) -> bool:
-    """Execute a single schema file.
+    """Execute a single schema file in the isolated database context.
+
+    Transforms CREATE TABLE statements to include the isolated database name.
 
     Args:
         schema_file: Path to SQL file
         client: ClickHouse client
         fail_on_error: Whether to raise exception on failure
         scope: "project" or "variant" for logging
+        isolated_database: Isolated database name
 
     Returns:
         True if successful, False if failed
@@ -147,8 +169,19 @@ def _execute_schema_file(
         logger.debug(f"Executing {scope} schema: {schema_file.name}")
         sql = schema_file.read_text()
 
-        # Execute entire file as single statement
-        client.execute_no_result(sql)
+        # Transform CREATE TABLE statements to include database name
+        # Pattern matches: CREATE TABLE [IF NOT EXISTS] table_name
+        # Replaces with: CREATE TABLE [IF NOT EXISTS] database.table_name
+        pattern = r'(CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?)(\w+)(\s*\()'
+        transformed_sql = re.sub(
+            pattern,
+            rf'\1{isolated_database}.\2\3',
+            sql,
+            flags=re.IGNORECASE
+        )
+
+        # Execute transformed SQL
+        client.execute_no_result(transformed_sql)
 
         logger.debug(f"Successfully executed {schema_file.name}")
         return True

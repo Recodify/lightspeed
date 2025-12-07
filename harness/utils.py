@@ -64,3 +64,36 @@ def format_duration(ms: float) -> str:
         return f"{ms / 1000:.2f}s"
     else:
         return f"{ms / 60000:.2f}m"
+
+
+def sanitize_name(name: str) -> str:
+    """Sanitize a name for use in ClickHouse identifiers.
+
+    Replaces hyphens with underscores and removes other invalid characters.
+
+    Args:
+        name: Name to sanitize
+
+    Returns:
+        Sanitized name safe for ClickHouse
+    """
+    return name.replace('-', '_')
+
+
+def compute_isolated_database_name(project: str, config_name: str, run_name: str, variant_name: str) -> str:
+    """Compute isolated database name using the pattern: [projectName]_[configName]_[runName]_[variantName]
+
+    Args:
+        project: Project name
+        config_name: Config file name (without extension)
+        run_name: Run name (e.g., 'brave-penguin')
+        variant_name: Variant name
+
+    Returns:
+        Database name (e.g., 'myproject_baseline_brave_penguin_optimized')
+    """
+    safe_project = sanitize_name(project)
+    safe_config = sanitize_name(config_name)
+    safe_run = sanitize_name(run_name)
+    safe_variant = sanitize_name(variant_name)
+    return f"{safe_project}_{safe_config}_{safe_run}_{safe_variant}"

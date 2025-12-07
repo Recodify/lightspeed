@@ -112,12 +112,18 @@ def cmd_init_db(args: argparse.Namespace) -> int:
         # Resolve variant
         config = resolve_variant_config(config, args.variant)
 
+        # Extract config name and generate/use run name
+        config_path = Path(args.config)
+        config_name = config_path.stem
         project_root = compute_project_root(config)
+        results_base = project_root / "results"
+        run_name = generate_run_name(results_base, args.run_name if hasattr(args, 'run_name') else None)
+
         variant_root = compute_variant_root(config)
 
         logger.debug("Applying database schema...")
         with ClickHouseClient(config.clickhouse) as client:
-            apply_schema(config, client, project_root, variant_root)
+            apply_schema(config, client, project_root, variant_root, run_name, config_name)
 
         logger.debug("Schema applied")
         return 0
@@ -146,12 +152,18 @@ def cmd_load_data(args: argparse.Namespace) -> int:
         # Resolve variant
         config = resolve_variant_config(config, args.variant)
 
+        # Extract config name and generate/use run name
+        config_path = Path(args.config)
+        config_name = config_path.stem
         project_root = compute_project_root(config)
+        results_base = project_root / "results"
+        run_name = generate_run_name(results_base, args.run_name if hasattr(args, 'run_name') else None)
+
         variant_root = compute_variant_root(config)
 
         logger.debug("Loading data into tables...")
         with ClickHouseClient(config.clickhouse) as client:
-            load_data(config, client, project_root, variant_root)
+            load_data(config, client, project_root, variant_root, run_name, config_name)
 
         logger.debug("Data loaded")
         return 0
@@ -194,7 +206,7 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
         logger.info(f"Run: {run_name}")
 
         logger.debug("Running workload...")
-        workload_result = run_workload(config, project_root, variant_root)
+        workload_result = run_workload(config, project_root, variant_root, run_name, config_name)
 
         execution_records = workload_result["records"]
         workload_metadata = {
@@ -328,7 +340,7 @@ def cmd_full_run(args: argparse.Namespace) -> int:
             variant_root = compute_variant_root(config)
 
             logger.debug("Running workload...")
-            workload_result = run_workload(config, project_root, variant_root)
+            workload_result = run_workload(config, project_root, variant_root, run_name, config_name)
 
             execution_records = workload_result["records"]
             workload_metadata = {

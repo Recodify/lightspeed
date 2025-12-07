@@ -1,6 +1,7 @@
 """Workload execution for benchmarking ClickHouse queries."""
 
 import logging
+import re
 import random
 import threading
 import time
@@ -16,6 +17,7 @@ from harness.clickhouse_client import ClickHouseClient
 from harness.config import BenchmarkConfig, ParameterSpec, WorkloadConfig
 from harness.exceptions import WorkloadAbortedError
 from harness.parameter_generator import generate_params
+from harness.utils import compute_isolated_database_name
 
 logger = logging.getLogger(__name__)
 
@@ -348,14 +350,18 @@ def worker_func(
 def run_workload(
     config: BenchmarkConfig,
     project_root: Path,
-    variant_root: Path
+    variant_root: Path,
+    run_name: str,
+    config_name: str
 ) -> dict:
-    """Execute workload and collect execution records.
+    """Execute workload and collect execution records with table isolation.
 
     Args:
         config: Benchmark configuration
         project_root: Project root directory
         variant_root: Variant root directory
+        run_name: Run name for isolation (e.g., 'brave-penguin')
+        config_name: Config file name (e.g., 'example_basic')
 
     Returns:
         Dict with keys:
@@ -367,6 +373,12 @@ def run_workload(
     Raises:
         WorkloadAbortedError: If max_errors threshold exceeded
     """
+    # Compute isolated database name
+    isolated_database = compute_isolated_database_name(
+        config.project, config_name, run_name, config.variant
+    )
+    logger.info(f"Using isolated database: {isolated_database}")
+
     # Load queries
     queries = load_queries(config.workload, project_root, variant_root)
 
@@ -388,9 +400,21 @@ def run_workload(
         )
     )
 
+    # Create ClickHouse client config with isolated database
+    from harness.config import ClickHouseConfig
+    isolated_ch_config = ClickHouseConfig(
+        host=config.clickhouse.host,
+        port=config.clickhouse.port,
+        user=config.clickhouse.user,
+        password=config.clickhouse.password,
+        database=isolated_database,  # Use isolated database
+        connection_pool_size=config.clickhouse.connection_pool_size,
+        timeout_seconds=config.clickhouse.timeout_seconds
+    )
+
     # Create ClickHouse client for workload
     client = ClickHouseClient(
-        config.clickhouse,
+        isolated_ch_config,
         timeout_seconds=config.workload.query_timeout_seconds
     )
 
