@@ -1,5 +1,6 @@
 """Report generation for benchmark results."""
 
+import json
 import logging
 from collections import defaultdict
 from datetime import datetime
@@ -24,7 +25,7 @@ def generate_reports(
     config_name: str,
     data_load_metrics: dict | None = None,
 ) -> None:
-    """Generate CSV and Markdown reports from benchmark results.
+    """Generate JSON, CSV, and Markdown reports from benchmark results.
 
     Args:
         config: Benchmark configuration
@@ -91,10 +92,21 @@ def generate_reports(
             "avg_memory_usage": avg_memory_usage,
         })
 
-    # Generate output paths: results/{config_name}/{run_name}/{variant}/results.csv
+    # Generate output paths: results/{config_name}/{run_name}/{variant}/results.*
     run_dir = _build_run_dir(config, project_root, config_name, run_name)
     csv_path = run_dir / Path(config.metrics.output_csv).name
     md_path = run_dir / Path(config.metrics.output_md).name
+    json_path = run_dir / "results.json"
+
+    # Generate JSON report (canonical)
+    _generate_json_report(
+        json_path,
+        query_stats,
+        workload_metadata,
+        config,
+        run_name,
+        config_name
+    )
 
     # Generate CSV report
     _generate_csv_report(
@@ -115,6 +127,15 @@ def generate_reports(
     # Generate data load outputs if provided
     if data_load_metrics is not None:
         data_csv_path = run_dir / Path(config.metrics.data_output_csv).name
+        data_json_path = run_dir / "data_load.json"
+
+        _generate_data_load_json(
+            data_json_path,
+            data_load_metrics,
+            config,
+            run_name,
+            config_name
+        )
         _generate_data_load_csv(
             data_csv_path,
             data_load_metrics,
@@ -126,9 +147,9 @@ def generate_reports(
             config,
             append=True
         )
-        logger.info(f"Data load results saved: {data_csv_path.relative_to(project_root.parent.parent)}")
+        logger.info(f"Data load results saved: {data_json_path.relative_to(project_root.parent.parent)}")
 
-    logger.info(f"Results saved: {csv_path.relative_to(project_root.parent.parent)}")
+    logger.info(f"Results saved: {json_path.relative_to(project_root.parent.parent)}")
 
 
 def generate_data_load_reports(
@@ -138,13 +159,21 @@ def generate_data_load_reports(
     run_name: str,
     config_name: str,
 ) -> None:
-    """Generate CSV and Markdown outputs for data loading only."""
+    """Generate JSON, CSV, and Markdown outputs for data loading only."""
     logger.debug("Generating data load reports...")
 
     run_dir = _build_run_dir(config, project_root, config_name, run_name)
     data_csv_path = run_dir / Path(config.metrics.data_output_csv).name
+    data_json_path = run_dir / "data_load.json"
     md_path = run_dir / Path(config.metrics.output_md).name
 
+    _generate_data_load_json(
+        data_json_path,
+        data_load_metrics,
+        config,
+        run_name,
+        config_name
+    )
     _generate_data_load_csv(
         data_csv_path,
         data_load_metrics,
@@ -157,7 +186,7 @@ def generate_data_load_reports(
         append=False
     )
 
-    logger.info(f"Data load results saved: {data_csv_path.relative_to(project_root.parent.parent)}")
+    logger.info(f"Data load results saved: {data_json_path.relative_to(project_root.parent.parent)}")
 
 
 def _generate_csv_report(
@@ -259,6 +288,55 @@ def _generate_markdown_report(
     logger.debug(f"Markdown report written to {output_path}")
 
 
+def _generate_json_report(
+    output_path: Path,
+    query_stats: list[dict],
+    workload_metadata: dict,
+    config: BenchmarkConfig,
+    run_name: str,
+    config_name: str
+) -> None:
+    """Generate JSON report with structured data."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Calculate summary statistics
+    total_queries = sum(s['count'] for s in query_stats)
+    total_errors = sum(s['errors'] for s in query_stats)
+    overall_error_rate = total_errors / total_queries if total_queries > 0 else 0.0
+    overall_qps = total_queries / workload_metadata['workload_elapsed_secs'] if workload_metadata['workload_elapsed_secs'] > 0 else 0.0
+
+    # Build structured JSON output
+    report_data = {
+        "schema_version": 1,
+        "metadata": {
+            "project": config.project,
+            "variant": config.variant,
+            "run_name": run_name,
+            "config_name": config_name,
+            "workload": {
+                "name": config.workload.name,
+                "concurrency": config.workload.concurrency,
+                "duration_seconds": config.workload.duration_seconds
+            },
+            "workload_start_epoch_ms": workload_metadata['workload_start_epoch_ms'],
+            "workload_end_epoch_ms": workload_metadata['workload_end_epoch_ms'],
+            "workload_elapsed_secs": workload_metadata['workload_elapsed_secs']
+        },
+        "queries": query_stats,
+        "summary": {
+            "total_queries": total_queries,
+            "total_errors": total_errors,
+            "overall_error_rate": overall_error_rate,
+            "overall_qps": overall_qps
+        }
+    }
+
+    with open(output_path, "w") as f:
+        json.dump(report_data, f, indent=2)
+
+    logger.debug(f"JSON report written to {output_path}")
+
+
 def _generate_data_load_csv(
     output_path: Path,
     data_load_metrics: dict,
@@ -336,6 +414,44 @@ def _write_data_load_markdown(
             )
 
     logger.debug(f"Data load markdown written to {output_path} (append={append})")
+
+
+def _generate_data_load_json(
+    output_path: Path,
+    data_load_metrics: dict,
+    config: BenchmarkConfig,
+    run_name: str,
+    config_name: str
+) -> None:
+    """Generate JSON with data load metrics."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    files = data_load_metrics.get("files", [])
+
+    # Build structured JSON output
+    report_data = {
+        "schema_version": 1,
+        "metadata": {
+            "project": config.project,
+            "variant": config.variant,
+            "run_name": run_name,
+            "config_name": config_name,
+            "load_method": config.data.load_method,
+            "truncate_before_load": config.data.truncate_before_load
+        },
+        "totals": {
+            "files_loaded": data_load_metrics.get('files_loaded', len(files)),
+            "bytes_transferred": data_load_metrics.get('bytes_transferred', 0),
+            "duration_ms": data_load_metrics.get('duration_ms', data_load_metrics.get('duration_secs', 0) * 1000),
+            "duration_secs": data_load_metrics.get('duration_secs', 0),
+            "throughput_mb_s": data_load_metrics.get('throughput_mb_s', 0)
+        },
+        "ingest": files
+    }
+
+    with open(output_path, "w") as f:
+        json.dump(report_data, f, indent=2)
+
+    logger.debug(f"Data load JSON written to {output_path}")
 
 
 def _build_run_dir(

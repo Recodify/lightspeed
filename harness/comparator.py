@@ -1,5 +1,6 @@
 """Comparison of benchmark results from different runs."""
 
+import json
 import logging
 from pathlib import Path
 
@@ -8,30 +9,93 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def compare_results(csv_a_path: str, csv_b_path: str, output_path: str) -> None:
-    """Compare two benchmark result CSV files and generate comparison report.
+def _load_results(path: str) -> pd.DataFrame:
+    """Load benchmark results from JSON (preferred) or CSV (fallback).
 
     Args:
-        csv_a_path: Path to first (baseline) CSV results file
-        csv_b_path: Path to second (comparison) CSV results file
+        path: Path to results file (can be JSON, CSV, or directory containing them)
+
+    Returns:
+        DataFrame with query results
+
+    Raises:
+        FileNotFoundError: If no valid results file is found
+        ValueError: If file format is invalid
+    """
+    path_obj = Path(path)
+
+    # If path is a directory, look for results.json or results.csv
+    if path_obj.is_dir():
+        json_file = path_obj / "results.json"
+        csv_file = path_obj / "results.csv"
+
+        if json_file.exists():
+            path_obj = json_file
+        elif csv_file.exists():
+            path_obj = csv_file
+        else:
+            raise FileNotFoundError(f"No results.json or results.csv found in {path}")
+
+    # Try JSON first
+    if path_obj.suffix == '.json' or (path_obj.suffix != '.csv' and path_obj.with_suffix('.json').exists()):
+        json_path = path_obj if path_obj.suffix == '.json' else path_obj.with_suffix('.json')
+        if json_path.exists():
+            logger.debug(f"Loading results from JSON: {json_path}")
+            try:
+                with open(json_path, 'r') as f:
+                    data = json.load(f)
+
+                # Extract query stats from JSON structure
+                if 'queries' in data:
+                    df = pd.DataFrame(data['queries'])
+                    logger.debug(f"Loaded {len(df)} queries from JSON")
+                    return df
+                else:
+                    raise ValueError(f"Invalid JSON format: missing 'queries' field in {json_path}")
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse JSON {json_path}: {e}. Trying CSV fallback.")
+            except Exception as e:
+                logger.warning(f"Failed to load JSON {json_path}: {e}. Trying CSV fallback.")
+
+    # Fall back to CSV
+    csv_path = path_obj if path_obj.suffix == '.csv' else path_obj.with_suffix('.csv')
+    if csv_path.exists():
+        logger.debug(f"Loading results from CSV: {csv_path}")
+        try:
+            df = pd.read_csv(csv_path, comment='#')
+            logger.debug(f"Loaded {len(df)} queries from CSV")
+            return df
+        except Exception as e:
+            raise ValueError(f"Failed to load CSV {csv_path}: {e}")
+
+    # Neither JSON nor CSV found
+    raise FileNotFoundError(f"No results file found at {path} (tried .json and .csv)")
+
+
+def compare_results(csv_a_path: str, csv_b_path: str, output_path: str) -> None:
+    """Compare two benchmark result files and generate comparison report.
+
+    Args:
+        csv_a_path: Path to first (baseline) results file (JSON, CSV, or directory)
+        csv_b_path: Path to second (comparison) results file (JSON, CSV, or directory)
         output_path: Path for output Markdown comparison report
 
     Raises:
-        FileNotFoundError: If either CSV file doesn't exist
-        ValueError: If CSV files have invalid format
+        FileNotFoundError: If either results file doesn't exist
+        ValueError: If results files have invalid format
     """
     logger.info(f"Comparing results: {csv_a_path} vs {csv_b_path}")
 
-    # Read CSV files, skipping comment lines (lines starting with #)
+    # Load results from JSON (preferred) or CSV (fallback)
     try:
-        df_a = pd.read_csv(csv_a_path, comment='#')
-        df_b = pd.read_csv(csv_b_path, comment='#')
+        df_a = _load_results(csv_a_path)
+        df_b = _load_results(csv_b_path)
     except FileNotFoundError as e:
-        logger.error(f"CSV file not found: {e}")
+        logger.error(f"Results file not found: {e}")
         raise
     except Exception as e:
-        logger.error(f"Failed to read CSV files: {e}")
-        raise ValueError(f"Invalid CSV format: {e}")
+        logger.error(f"Failed to load results files: {e}")
+        raise ValueError(f"Invalid results format: {e}")
 
     # Validate required columns
     required_cols = ['query_name', 'count', 'qps', 'p50_ms', 'p95_ms', 'p99_ms']

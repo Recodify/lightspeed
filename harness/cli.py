@@ -405,10 +405,10 @@ def cmd_full_run(args: argparse.Namespace) -> int:
                 data_load_metrics=data_load_metrics,
             )
 
-            # Track result CSV for later comparisons
+            # Track result path for later comparisons (prefer JSON)
             run_dir = compute_run_dir(config, project_root, config_name, run_name)
-            result_csv = run_dir / Path(config.metrics.output_csv).name
-            run_results.append((variant_name, result_csv))
+            result_json = run_dir / "results.json"
+            run_results.append((variant_name, result_json))
 
             logger.info("=" * 60)
             logger.info(f"Benchmark completed: {config.variant}")
@@ -417,13 +417,13 @@ def cmd_full_run(args: argparse.Namespace) -> int:
 
         # Perform comparisons when multiple variants are run
         if len(run_results) > 1:
-            baseline_variant, baseline_csv = run_results[0]
-            comparison_root = baseline_csv.parent.parent  # .../<config>/<run>/
-            for variant, csv_path in run_results[1:]:
+            baseline_variant, baseline_path = run_results[0]
+            comparison_root = baseline_path.parent.parent  # .../<config>/<run>/
+            for variant, result_path in run_results[1:]:
                 comparison_name = f"comparison_{sanitize_name(baseline_variant)}_vs_{sanitize_name(variant)}.md"
                 output_path = comparison_root / comparison_name
                 try:
-                    compare_results(str(baseline_csv), str(csv_path), str(output_path))
+                    compare_results(str(baseline_path), str(result_path), str(output_path))
                     rel_out = output_path.relative_to(project_root.parent.parent)
                     logger.info(f"Comparison complete: {rel_out}")
                 except Exception as e:
@@ -441,7 +441,7 @@ def cmd_full_run(args: argparse.Namespace) -> int:
 
 
 def cmd_compare(args: argparse.Namespace) -> int:
-    """Compare two benchmark result CSV files.
+    """Compare two benchmark result files (JSON or CSV).
 
     Args:
         args: Command-line arguments
@@ -461,7 +461,7 @@ def cmd_compare(args: argparse.Namespace) -> int:
         logger.error(f"File not found: {e}")
         return 1
     except ValueError as e:
-        logger.error(f"Invalid CSV file: {e}")
+        logger.error(f"Invalid results file: {e}")
         return 1
     except Exception as e:
         logger.error(f"Unexpected error during comparison: {e}", exc_info=True)
@@ -559,17 +559,17 @@ def main() -> int:
     # compare command
     parser_compare = subparsers.add_parser(
         "compare",
-        help="Compare two benchmark result CSV files",
+        help="Compare two benchmark result files (JSON or CSV)",
     )
     parser_compare.add_argument(
         "csv_a",
         type=str,
-        help="Path to first (baseline) CSV results file",
+        help="Path to first (baseline) results file (JSON, CSV, or directory)",
     )
     parser_compare.add_argument(
         "csv_b",
         type=str,
-        help="Path to second (comparison) CSV results file",
+        help="Path to second (comparison) results file (JSON, CSV, or directory)",
     )
     parser_compare.add_argument(
         "--output",

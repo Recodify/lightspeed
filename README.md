@@ -12,7 +12,7 @@ This Python-based benchmarking harness for ClickHouse allows users to run repeat
 
 **Workload execution**: Allows concurrency, ramp-up, warmup, parameterized queries, and weighted query selection for realistic performance testing.
 
-**Rich reporting**: Outputs performance metrics in CSV and Markdown format, with built-in comparison tools for regression testing.
+**Rich reporting**: Outputs performance metrics in JSON (canonical), CSV, and Markdown formats, with built-in comparison tools for regression testing.
 
 ## Repository Layout
 
@@ -98,7 +98,7 @@ To run only a specific variant, add `--variant variant1`.
 
 Use `--verbose` for debug logs.
 
-Reports will be saved in `projects/default/results/` with variant-specific filenames (e.g., `results_default.csv`, `results_variant1.md`).
+Reports will be saved in `projects/default/results/` with variant-specific directories containing `results.json`, `results.csv`, `results.md`, and optionally `data_load.json` and `data_load.csv`.
 
 ## Common Commands
 
@@ -192,9 +192,36 @@ metrics:
   data_output_csv: "results/baseline_data_load.csv"
 ```
 
+## Output Formats
+
+The harness generates results in multiple formats for different use cases:
+
+### JSON (Canonical Format)
+
+JSON is the primary machine-readable format. All result files include a `schema_version` field to support future evolution.
+
+**`results.json`**: Contains workload performance metrics
+- `metadata`: Project, variant, workload config, and timing information
+- `queries`: Array of per-query statistics (count, errors, error_rate, qps, p50/p95/p99 latency, resource usage)
+- `summary`: Aggregated metrics (total queries, errors, QPS)
+
+**`data_load.json`**: Contains data loading metrics (when applicable)
+- `metadata`: Project, variant, and load configuration
+- `totals`: Aggregate load metrics (files loaded, bytes transferred, duration, throughput)
+- `ingest`: Per-file load details
+
+### CSV and Markdown
+
+CSV and Markdown files are generated alongside JSON for human readability and backward compatibility:
+- `results.csv`: Tabular query metrics with metadata as comments
+- `results.md`: Formatted report with tables and summary statistics
+- `data_load.csv`: Per-file data load metrics
+
+All formats are written to: `projects/<project>/results/<config>/<run>/<variant>/`
+
 ## Comparing Results
 
-To compare two sets of results (CSV), run the following command:
+To compare two sets of results, run the following command (accepts JSON, CSV, or directory paths):
 
 ```bash
 python -m harness.cli compare \
