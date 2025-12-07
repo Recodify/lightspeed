@@ -253,6 +253,7 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
                 execution_records,
                 start_time,
                 end_time,
+                workload_result.get("query_id_prefix"),
             )
 
         # Generate reports with run_name and config_name
@@ -388,6 +389,7 @@ def cmd_full_run(args: argparse.Namespace) -> int:
                     execution_records,
                     start_time,
                     end_time,
+                    workload_result.get("query_id_prefix"),
                 )
 
             # Generate reports with run_name and config_name

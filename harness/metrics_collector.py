@@ -17,7 +17,8 @@ def collect_query_log_metrics(
     client: ClickHouseClient,
     execution_records: list[ExecutionRecord],
     start_time: datetime,
-    end_time: datetime
+    end_time: datetime,
+    query_id_prefix: str,
 ) -> dict[str, dict]:
     """Collect metrics from system.query_log for executed queries.
 
@@ -52,10 +53,12 @@ def collect_query_log_metrics(
 
     # Extract all query_ids from execution records
     query_ids = [record.query_id for record in execution_records]
-
     if not query_ids:
         logger.warning("No execution records to collect metrics for")
         return {}
+
+    if not query_id_prefix:
+        raise MetricsCollectionError("query_id_prefix is required for metrics collection")
 
     logger.debug(f"Collecting metrics for {len(query_ids)} queries from system.query_log")
 
@@ -63,9 +66,6 @@ def collect_query_log_metrics(
     # Convert datetime to string format ClickHouse expects
     start_time_str = start_time.strftime("%Y-%m-%d %H:%M:%S")
     end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
-
-    # Create IN clause with quoted query_ids
-    query_ids_clause = ", ".join(f"'{qid}'" for qid in query_ids)
 
     sql = f"""
         SELECT
@@ -78,7 +78,7 @@ def collect_query_log_metrics(
             memory_usage
         FROM system.query_log
         WHERE type = 'QueryFinish'
-            AND query_id IN ({query_ids_clause})
+            AND query_id LIKE '{query_id_prefix}%'
             AND event_time >= toDateTime('{start_time_str}')
             AND event_time <= toDateTime('{end_time_str}')
         ORDER BY event_time DESC
@@ -93,8 +93,13 @@ def collect_query_log_metrics(
 
     # Build mapping of query_id to metrics
     metrics_map = {}
+    executed_ids = set(query_ids)
     for row in results:
         query_id = row["query_id"]
+
+        # Skip metrics not in our executed set (if using prefix filter)
+        if executed_ids and query_id not in executed_ids:
+            continue
 
         # If we see duplicate query_ids (shouldn't happen normally), take the latest
         if query_id in metrics_map:

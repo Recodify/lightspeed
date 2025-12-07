@@ -227,7 +227,8 @@ def worker_func(
     error_counter: SharedCounter,
     worker_id: int,
     start_time: float,
-    duration_seconds: int
+    duration_seconds: int,
+    query_id_prefix: str,
 ) -> list[ExecutionRecord]:
     """Worker function for concurrent query execution.
 
@@ -279,8 +280,8 @@ def worker_func(
             logger.warning(f"Worker {worker_id}: parameter substitution failed: {e}")
             continue
 
-        # Generate unique query_id
-        query_id = f"{query_name}_{uuid.uuid4()}"
+        # Generate unique query_id with run-scoped prefix to allow query_log LIKE filtering
+        query_id = f"{query_id_prefix}_{query_name}_{uuid.uuid4()}"
 
         # Execute query
         started_at = datetime.now()
@@ -374,10 +375,11 @@ def run_workload(
     Raises:
         WorkloadAbortedError: If max_errors threshold exceeded
     """
-    # Compute isolated database name
+    # Compute isolated database name and query_id prefix scoped to this run/variant
     isolated_database = compute_isolated_database_name(
         config.project, config_name, run_name, config.variant
     )
+    query_id_prefix = f"{isolated_database}_q"
     logger.info(f"Using isolated database: {isolated_database}")
 
     # Load queries
@@ -455,7 +457,8 @@ def run_workload(
                 error_counter,
                 i,
                 start_time,
-                config.workload.duration_seconds
+                config.workload.duration_seconds,
+                query_id_prefix,
             )
             futures.append(future)
 
@@ -501,5 +504,6 @@ def run_workload(
         "records": all_records,
         "workload_start_epoch_ms": workload_start_epoch_ms,
         "workload_end_epoch_ms": workload_end_epoch_ms,
-        "workload_elapsed_secs": workload_elapsed_secs
+        "workload_elapsed_secs": workload_elapsed_secs,
+        "query_id_prefix": query_id_prefix,
     }
