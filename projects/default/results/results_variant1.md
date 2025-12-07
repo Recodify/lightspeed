@@ -6,20 +6,20 @@
 - **Variant**: variant1
 - **Workload**: basic_benchmark
 - **Concurrency**: 4
-- **Start Time**: 2025-12-07 14:20:47
-- **End Time**: 2025-12-07 14:20:57
+- **Start Time**: 2025-12-07 14:53:14
+- **End Time**: 2025-12-07 14:53:24
 - **Duration**: 10.01 seconds
 
 ## Query Performance
 
 | Query Name | Count | Errors | Error Rate | QPS | p50 (ms) | p95 (ms) | p99 (ms) | Avg Rows Read | Avg Bytes Read | Avg Memory (bytes) |
 |------------|-------|--------|------------|-----|----------|----------|----------|---------------|----------------|--------------------|
-| q01_simple.sql | 1698 | 0 | 0.00% | 169.70 | 9.30 | 18.36 | 25.02 | 20 | 266 | 5371351 |
-| q02_aggregate.sql | 1770 | 0 | 0.00% | 176.89 | 11.41 | 20.71 | 30.67 | 20 | 426 | 5468585 |
+| q01_simple.sql | 1629 | 0 | 0.00% | 162.75 | 9.88 | 19.70 | 27.03 | 20 | 266 | 5372115 |
+| q02_aggregate.sql | 1673 | 0 | 0.00% | 167.15 | 12.01 | 21.54 | 28.60 | 20 | 426 | 5468720 |
 
 ## Summary
 
-- **Total Queries Executed**: 3468
+- **Total Queries Executed**: 3302
 - **Total Errors**: 0
 - **Overall Error Rate**: 0.00%
-- **Overall QPS**: 346.59
+- **Overall QPS**: 329.90

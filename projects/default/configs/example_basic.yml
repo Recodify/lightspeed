@@ -1,6 +1,6 @@
 project: default
-variant: default  # Change this to test different variants
 
+# Project-level defaults (shared across all variants)
 clickhouse:
   host: localhost
   port: 8123
@@ -13,14 +13,6 @@ clickhouse:
 schema:
   fail_on_error: true
   fresh: true
-
-data:
-  load_method: insert
-  truncate_before_load: false
-  load:
-    - table: events
-      file: sample.csv
-      format: CSVWithNames
 
 workload:
   name: basic_benchmark
@@ -45,3 +37,25 @@ metrics:
   # Output paths will automatically include variant name: results/results_{variant}.csv
   output_csv: results/results.csv
   output_md: results/results.md
+
+# Define variants with different data configurations
+variants:
+  default:
+    description: "Baseline configuration with sample data"
+    data:
+      load_method: insert
+      truncate_before_load: false
+      load:
+        - table: events
+          file: sample.csv
+          format: CSVWithNames
+
+  variant1:
+    description: "Variant 1 configuration (same as default for now)"
+    data:
+      load_method: insert
+      truncate_before_load: false
+      load:
+        - table: events
+          file: sample.csv
+          format: CSVWithNames

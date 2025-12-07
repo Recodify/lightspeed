@@ -12,6 +12,7 @@ from harness.config import (
     compute_project_root,
     compute_variant_root,
     load_config,
+    resolve_variant_config,
     validate_config,
 )
 from harness.data_loader import load_data
@@ -37,6 +38,9 @@ def cmd_validate(args: argparse.Namespace) -> int:
     try:
         logger.info(f"Loading configuration from {args.config}")
         config = load_config(args.config)
+
+        # Resolve variant
+        config = resolve_variant_config(config, args.variant)
 
         logger.info("Validating configuration...")
         validate_config(config)
@@ -74,6 +78,9 @@ def cmd_init_db(args: argparse.Namespace) -> int:
         logger.info(f"Loading configuration from {args.config}")
         config = load_config(args.config)
 
+        # Resolve variant
+        config = resolve_variant_config(config, args.variant)
+
         project_root = compute_project_root(config)
         variant_root = compute_variant_root(config)
 
@@ -105,6 +112,9 @@ def cmd_load_data(args: argparse.Namespace) -> int:
         logger.info(f"Loading configuration from {args.config}")
         config = load_config(args.config)
 
+        # Resolve variant
+        config = resolve_variant_config(config, args.variant)
+
         project_root = compute_project_root(config)
         variant_root = compute_variant_root(config)
 
@@ -135,6 +145,9 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
     try:
         logger.info(f"Loading configuration from {args.config}")
         config = load_config(args.config)
+
+        # Resolve variant
+        config = resolve_variant_config(config, args.variant)
 
         project_root = compute_project_root(config)
         variant_root = compute_variant_root(config)
@@ -199,6 +212,9 @@ def cmd_full_run(args: argparse.Namespace) -> int:
     try:
         logger.info(f"Loading configuration from {args.config}")
         config = load_config(args.config)
+
+        # Resolve variant
+        config = resolve_variant_config(config, args.variant)
 
         # If dry-run, only validate
         if args.dry_run:
@@ -291,6 +307,7 @@ def main() -> int:
         help="Validate configuration and test ClickHouse connectivity",
     )
     parser_validate.add_argument("--config", type=str, required=True, help="Path to configuration YAML file")
+    parser_validate.add_argument("--variant", type=str, default="default", help="Variant to run (default: default)")
     parser_validate.add_argument("--verbose", action="store_true", help="Enable verbose logging (DEBUG level)")
 
     # init-db command
@@ -299,6 +316,7 @@ def main() -> int:
         help="Initialize database schema",
     )
     parser_init_db.add_argument("--config", type=str, required=True, help="Path to configuration YAML file")
+    parser_init_db.add_argument("--variant", type=str, default="default", help="Variant to run (default: default)")
     parser_init_db.add_argument("--verbose", action="store_true", help="Enable verbose logging (DEBUG level)")
 
     # load-data command
@@ -307,6 +325,7 @@ def main() -> int:
         help="Load data into ClickHouse tables",
     )
     parser_load_data.add_argument("--config", type=str, required=True, help="Path to configuration YAML file")
+    parser_load_data.add_argument("--variant", type=str, default="default", help="Variant to run (default: default)")
     parser_load_data.add_argument("--verbose", action="store_true", help="Enable verbose logging (DEBUG level)")
 
     # run-workload command
@@ -315,6 +334,7 @@ def main() -> int:
         help="Run workload and collect metrics",
     )
     parser_run_workload.add_argument("--config", type=str, required=True, help="Path to configuration YAML file")
+    parser_run_workload.add_argument("--variant", type=str, default="default", help="Variant to run (default: default)")
     parser_run_workload.add_argument("--verbose", action="store_true", help="Enable verbose logging (DEBUG level)")
 
     # full-run command
@@ -323,6 +343,7 @@ def main() -> int:
         help="Run complete benchmark (validate, init-db if fresh, load-data, run-workload)",
     )
     parser_full_run.add_argument("--config", type=str, required=True, help="Path to configuration YAML file")
+    parser_full_run.add_argument("--variant", type=str, default="default", help="Variant to run (default: default)")
     parser_full_run.add_argument("--verbose", action="store_true", help="Enable verbose logging (DEBUG level)")
     parser_full_run.add_argument(
         "--dry-run",

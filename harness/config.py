@@ -95,18 +95,92 @@ class MetricsConfig(BaseModel):
     output_md: str
 
 
+class VariantConfig(BaseModel):
+    """Variant-specific configuration overrides."""
+
+    model_config = {"protected_namespaces": ()}
+
+    description: str | None = None
+    clickhouse: ClickHouseConfig | None = None
+    schema: SchemaConfig | None = None
+    data: DataConfig | None = None
+    workload: WorkloadConfig | None = None
+    metrics: MetricsConfig | None = None
+
+
 class BenchmarkConfig(BaseModel):
     """Complete benchmark configuration."""
 
     model_config = {"protected_namespaces": ()}
 
     project: str
-    variant: str
-    clickhouse: ClickHouseConfig
-    schema: SchemaConfig
-    data: DataConfig
-    workload: WorkloadConfig
-    metrics: MetricsConfig
+    variant: str = "default"
+    clickhouse: ClickHouseConfig | None = None
+    schema: SchemaConfig | None = None
+    data: DataConfig | None = None
+    workload: WorkloadConfig | None = None
+    metrics: MetricsConfig | None = None
+    variants: dict[str, VariantConfig] | None = None
+
+
+def resolve_variant_config(base_config: BenchmarkConfig, variant_name: str) -> BenchmarkConfig:
+    """
+    Resolve variant configuration by applying variant overrides to base config.
+
+    Args:
+        base_config: Base configuration with optional variants section
+        variant_name: Name of variant to resolve
+
+    Returns:
+        New BenchmarkConfig with variant-specific values applied
+
+    Raises:
+        ValidationError: If variant doesn't exist or config is invalid
+    """
+    # If no variants defined, use config as-is (backward compatibility)
+    if base_config.variants is None:
+        logger.debug(f"No variants section found, using config as-is with variant name: {variant_name}")
+        # Create new config with updated variant name
+        return BenchmarkConfig(
+            project=base_config.project,
+            variant=variant_name,
+            clickhouse=base_config.clickhouse,
+            schema=base_config.schema,
+            data=base_config.data,
+            workload=base_config.workload,
+            metrics=base_config.metrics,
+            variants=None
+        )
+
+    # Check if variant exists
+    if variant_name not in base_config.variants:
+        available = ", ".join(base_config.variants.keys())
+        raise ValidationError(
+            f"Variant '{variant_name}' not found. Available variants: {available}"
+        )
+
+    variant = base_config.variants[variant_name]
+    logger.info(f"Resolving variant: {variant_name}")
+    if variant.description:
+        logger.info(f"  Description: {variant.description}")
+
+    # Apply variant overrides (base + variant = desired state)
+    resolved_clickhouse = variant.clickhouse if variant.clickhouse is not None else base_config.clickhouse
+    resolved_schema = variant.schema if variant.schema is not None else base_config.schema
+    resolved_data = variant.data if variant.data is not None else base_config.data
+    resolved_workload = variant.workload if variant.workload is not None else base_config.workload
+    resolved_metrics = variant.metrics if variant.metrics is not None else base_config.metrics
+
+    return BenchmarkConfig(
+        project=base_config.project,
+        variant=variant_name,
+        clickhouse=resolved_clickhouse,
+        schema=resolved_schema,
+        data=resolved_data,
+        workload=resolved_workload,
+        metrics=resolved_metrics,
+        variants=base_config.variants  # Keep variants in resolved config
+    )
 
 
 def load_config(config_path: str | Path) -> BenchmarkConfig:
