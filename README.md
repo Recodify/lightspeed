@@ -1,185 +1,243 @@
 # ClickHouse Benchmarking Harness
 
-This Python-based benchmarking harness for ClickHouse allows users to run repeatable benchmarks across various schema variants. The tool supports automatic schema and data setup, as well as rich, configurable reporting. It includes functionality to handle multiple projects and variants for comprehensive performance analysis.
+A Python-based benchmarking harness for ClickHouse that enables systematic performance testing across different schema designs. Run repeatable benchmarks, compare variants, and make data-driven schema decisions with comprehensive performance metrics.
 
-## Highlights
+## Why This Tool Exists
 
-**YAML-driven configuration**: Easily define variants with per-variant overrides, such as different schemas, data files, workloads, and ClickHouse settings.
+ClickHouse offers unprecedented flexibility in schema design compared to traditional databases. For any given use case, you might choose between:
 
-**Schema/application lifecycle**: Option to create fresh databases, manage project + variant schema layers, and apply migrations.
+- **Table engines**: MergeTree, ReplacingMergeTree, SummingMergeTree, AggregatingMergeTree, and more
+- **Indexing strategies**: Primary keys, secondary indexes, bloom filters, set indexes
+- **Partitioning schemes**: By time, by key, by hash, or no partitioning
+- **Compression codecs**: LZ4, ZSTD, Delta, DoubleDelta, Gorilla, and combinations
+- **Materialized views**: Pre-aggregations vs query-time aggregation
+- **Data types**: Specialized types like LowCardinality, Array, Map, Nested
+- **Settings**: Hundreds of tunables affecting merge behavior, memory usage, and parallelism
 
-**Flexible data loading**: Supports CSV, Parquet, and other formats, using efficient HTTP insert streams.
+This flexibility is powerful but creates a problem: **How do you know which design performs best for your workload?**
 
-**Workload execution**: Allows concurrency, ramp-up, warmup, parameterized queries, and weighted query selection for realistic performance testing.
+This harness solves that problem by making it trivial to:
+1. Define multiple schema variants
+2. Run identical workloads against each
+3. Compare performance with statistical rigor
+4. Make informed decisions based on real data
 
-**Rich reporting**: Outputs performance metrics in JSON (canonical), CSV, and Markdown formats, with built-in comparison tools for regression testing.
+## Features
 
-## Repository Layout
+- **Multi-variant benchmarking**: Test multiple schema designs with identical workloads
+- **YAML-driven configuration**: Define everything in code-reviewed, version-controlled configs
+- **Comprehensive metrics**: Latency percentiles (p50/p95/p99), throughput (QPS), resource usage (memory, rows/bytes read)
+- **Multiple output formats**: JSON (canonical), CSV, and Markdown reports
+- **N-way comparison**: Compare all variants side-by-side with rankings and deltas
+- **Flexible data loading**: CSV, Parquet, and other formats via HTTP streaming
+- **Realistic workloads**: Concurrency, ramp-up, warmup, weighted queries, parameterized queries
+- **Schema lifecycle management**: Fresh databases, migrations, layered project + variant schemas
+- **Repeatable runs**: Named runs with consistent output organization
 
-```
-ch-harness/
-  pyproject.toml           # Project dependencies
-  README.md                # This document
+## Quick Start
 
-  harness/
-    __init__.py
-    config.py              # Configuration handling
-    clickhouse_client.py   # Interfacing with ClickHouse
-    schema_loader.py       # Schema creation and application
-    data_loader.py         # Data loading via HTTP insert
-    workload_runner.py     # Executes workload and manages concurrency
-    metrics_collector.py   # Collects performance metrics
-    reporter.py            # Generates output reports
-    comparator.py          # Compares benchmark results
-    parameter_generator.py # Handles query parameters
-    utils.py               # Utility functions
-    exceptions.py          # Custom exceptions for error handling
-    cli.py                 # Command-line interface
-
-  projects/
-    <project_name>/
-      configs/              # Benchmark configuration YAMLs
-        example_basic.yml
-        example_weighted.yml
-        example_params.yml
-
-      schemas/              # Project-wide schema files (optional)
-      data/                 # Project-wide data files (optional)
-      workloads/            # Project-wide workload queries
-        baseline/
-          q01_latency.sql
-          q02_throughput.sql
-        heavy/
-          q01_full_scan.sql
-
-      variants/             # Variant-specific overrides (schemas, data, etc.)
-        <variant_name>/
-          schemas/
-            001_create_tables.sql
-            002_indexes.sql
-          data/
-            trades.csv
-            prices.parquet
-          workloads/
-            baseline/
-              q01_latency.sql
-
-      results/              # Benchmark result output files
-        .gitkeep
-```
-
-## Prerequisites
+### Prerequisites
 
 - Python 3.10+
-- A ClickHouse server accessible over HTTP (localhost:8123 by default)
-- Ensure the configured user has permission to create databases/tables and read from system.query_log
+- ClickHouse server accessible over HTTP (default: localhost:8123)
+- User permissions to create databases/tables and read from system.query_log
 
-## Setup
-
-To get started, first set up the environment and install the necessary dependencies.
+### Installation
 
 ```bash
+git clone <repository-url>
+cd lightspeed
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -e .
 ```
 
-## Running the Sample Project
+### Minimal Example
 
-1. **Set up ClickHouse**: Ensure your ClickHouse server is running and update the credentials in `projects/default/configs/example_basic.yml` if needed.
-
-2. **Run a full benchmark** (including schema, data, and workload for all configured variants):
-
-```bash
-python -m harness.cli full-run --config projects/default/configs/example_basic.yml
-```
-
-To run only a specific variant, add `--variant variant1`.
-
-Use `--verbose` for debug logs.
-
-Reports will be saved in `projects/default/results/` with variant-specific directories containing `results.json`, `results.csv`, `results.md`, and optionally `data_load.json` and `data_load.csv`.
-
-## Common Commands
-
-**Validate connectivity and files:**
-
-```bash
-python -m harness.cli validate --config projects/default/configs/example_basic.yml
-```
-
-**Apply schema only:**
-
-```bash
-python -m harness.cli init-db --config projects/default/configs/example_basic.yml
-```
-
-**Load data only:**
-
-```bash
-python -m harness.cli load-data --config projects/default/configs/example_basic.yml
-```
-
-**Run workload only:**
-
-```bash
-python -m harness.cli run-workload --config projects/default/configs/example_basic.yml
-```
-
-## Configuration Essentials
-
-Each config (`projects/<project>/configs/*.yml`) defines:
-
-- **project**: The project directory name under `projects/`
-- **variant**: Defines which variant to run, overriding default configurations for specific tests
-- **clickhouse**: Connection details (host, port, user, password, database, etc.)
-- **schema**: Schema settings (e.g., `fresh` to drop and recreate the database)
-- **data**: Data load settings (e.g., `load_method` for inserting data via HTTP)
-- **workload**: Defines the workload with concurrency, duration, query parameters, and query selection
-- **metrics**: Defines which metrics to collect, and where to output them (workload CSV/MD plus a data-load CSV)
-
-### Example configuration file:
+Create a minimal config file at `projects/myproject/configs/simple.yml`:
 
 ```yaml
-project: "default"
-variant: "variant_a"
+project: "myproject"
+variant: "baseline"
 
 clickhouse:
   host: "localhost"
   port: 8123
   user: "default"
   password: ""
-  database: "bench"
-  connection_pool_size: 20
-  timeout_seconds: 300  # Timeout for schema, data, and metrics operations
+  database: "benchmark"
 
 schema:
-  fail_on_error: true
+  fresh: true  # Drop and recreate database
+
+data:
+  load_method: "http"
+  load: []  # No data for this minimal example
+
+workload:
+  name: "simple"
+  path: "simple"
+  queries:
+    - file: "query.sql"
+  concurrency: 1
+  duration_seconds: 10
+
+metrics:
+  use_query_log: true
+```
+
+Create a schema at `projects/myproject/variants/baseline/schemas/001_create_table.sql`:
+
+```sql
+CREATE TABLE events (
+    timestamp DateTime,
+    user_id UInt64,
+    event_type String
+) ENGINE = MergeTree()
+ORDER BY (timestamp, user_id);
+```
+
+Create a query at `projects/myproject/workloads/simple/query.sql`:
+
+```sql
+SELECT count() FROM events WHERE timestamp > now() - INTERVAL 1 DAY;
+```
+
+Run the benchmark:
+
+```bash
+python -m harness.cli full-run --config projects/myproject/configs/simple.yml
+```
+
+Results will be saved to `projects/myproject/results/<config>/<run>/baseline/`.
+
+## Project Structure
+
+```
+lightspeed/
+├── harness/                    # Core benchmarking engine
+│   ├── cli.py                  # Command-line interface
+│   ├── config.py               # Configuration parsing and validation
+│   ├── clickhouse_client.py   # ClickHouse HTTP client
+│   ├── schema_loader.py        # Schema application (SQL files)
+│   ├── data_loader.py          # Data loading (CSV, Parquet, etc.)
+│   ├── workload_runner.py      # Concurrent query execution
+│   ├── metrics_collector.py   # Performance metrics from query_log
+│   ├── reporter.py             # JSON/CSV/Markdown report generation
+│   ├── comparator.py           # Multi-variant comparison reports
+│   └── parameter_generator.py # Query parameterization
+│
+└── projects/                   # Your benchmarking projects
+    └── <project_name>/
+        ├── configs/            # Benchmark configurations (YAML)
+        │   └── example.yml
+        │
+        ├── schemas/            # Project-wide schemas (shared across variants)
+        │   └── 001_dimensions.sql
+        │
+        ├── data/               # Project-wide data files (shared across variants)
+        │   └── dimensions.csv
+        │
+        ├── workloads/          # Query workloads
+        │   ├── baseline/
+        │   │   ├── q01_point_lookup.sql
+        │   │   └── q02_aggregation.sql
+        │   └── heavy/
+        │       └── q01_full_scan.sql
+        │
+        ├── variants/           # Schema variants to benchmark
+        │   ├── baseline/       # Example: standard MergeTree
+        │   │   ├── schemas/
+        │   │   │   ├── 001_create_events.sql
+        │   │   │   └── 002_indexes.sql
+        │   │   └── data/
+        │   │       └── events.csv
+        │   │
+        │   ├── optimized/      # Example: with secondary indexes
+        │   │   └── schemas/
+        │   │       ├── 001_create_events.sql
+        │   │       └── 002_indexes.sql
+        │   │
+        │   └── partitioned/    # Example: with partitioning
+        │       └── schemas/
+        │           └── 001_create_events.sql
+        │
+        └── results/            # Benchmark outputs
+            └── <config>/
+                └── <run>/
+                    ├── baseline/
+                    │   ├── results.json
+                    │   ├── results.csv
+                    │   ├── results.md
+                    │   └── data_load.json
+                    ├── optimized/
+                    │   └── results.json
+                    └── comparison_all_variants.md
+```
+
+### File Organization Principles
+
+**Project-level files** (`schemas/`, `data/`, `workloads/`):
+- Shared across all variants
+- Use for dimension tables, lookup data, common queries
+- Applied first, before variant-specific files
+
+**Variant-level files** (`variants/<name>/schemas/`, `variants/<name>/data/`):
+- Specific to each variant
+- Contains the schema/data that differs between variants
+- Applied after project-level files
+
+**Result organization**: `projects/<project>/results/<config>/<run>/<variant>/`
+- `<config>`: Configuration file name (without .yml)
+- `<run>`: Named run or auto-generated name (e.g., "bold-penguin")
+- `<variant>`: Variant name
+
+## Configuration Reference
+
+### Complete Example
+
+```yaml
+project: "default"
+variant: "baseline"
+
+clickhouse:
+  host: "localhost"
+  port: 8123
+  user: "default"
+  password: ""
+  database: "benchmark"
+  connection_pool_size: 20
+  timeout_seconds: 300
+
+schema:
   fresh: true
+  fail_on_error: true
 
 data:
   load_method: "http"
   truncate_before_load: true
   load:
-    - table: "trades"
-      file: "trades.csv"
+    - table: "events"
+      file: "events.csv"
       format: "CSVWithNames"
-    - table: "prices"
-      file: "prices.parquet"
+    - table: "metrics"
+      file: "metrics.parquet"
       format: "Parquet"
 
 workload:
   name: "baseline"
   path: "baseline"
   queries:
-    - file: "q01_latency.sql"
+    - file: "q01_point_lookup.sql"
       weight: 10
-    - file: "q02_throughput.sql"
+    - file: "q02_aggregation.sql"
+      weight: 5
+    - file: "q03_range_scan.sql"
       weight: 1
   concurrency: 8
   duration_seconds: 120
   ramp_up_seconds: 10
-  warmup_queries: 20
+  warmup_queries: 100
   think_time_ms: 50
   max_errors: 100
   query_timeout_seconds: 60
@@ -187,109 +245,612 @@ workload:
 metrics:
   use_query_log: true
   query_log_wait_seconds: 10
-  output_csv: "results/baseline_variant_a.csv"
-  output_md:  "results/baseline_variant_a.md"
-  data_output_csv: "results/baseline_data_load.csv"
 ```
 
-## Output Formats
+### Section: `clickhouse`
 
-The harness generates results in multiple formats for different use cases:
+Connection and client configuration.
 
-### JSON (Canonical Format)
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `host` | string | Yes | - | ClickHouse server hostname or IP |
+| `port` | integer | Yes | - | HTTP port (usually 8123) |
+| `user` | string | Yes | - | Database user |
+| `password` | string | No | `""` | User password |
+| `database` | string | Yes | - | Target database name |
+| `connection_pool_size` | integer | No | 10 | HTTP connection pool size |
+| `timeout_seconds` | integer | No | 300 | Timeout for schema/data/metrics operations |
 
-JSON is the primary machine-readable format. All result files include a `schema_version` field to support future evolution.
+### Section: `schema`
 
-**`results.json`**: Contains workload performance metrics
-- `metadata`: Project, variant, workload config, and timing information
-- `queries`: Array of per-query statistics (count, errors, error_rate, qps, p50/p95/p99 latency, resource usage)
-- `summary`: Aggregated metrics (total queries, errors, QPS)
+Schema loading behavior.
 
-**`data_load.json`**: Contains data loading metrics (when applicable)
-- `metadata`: Project, variant, and load configuration
-- `totals`: Aggregate load metrics (files loaded, bytes transferred, duration, throughput)
-- `ingest`: Per-file load details
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `fresh` | boolean | No | false | Drop and recreate database before applying schemas |
+| `fail_on_error` | boolean | No | true | Abort if any schema file fails to execute |
 
-### CSV and Markdown
+**Schema file order**: Files are executed in lexicographic order. Use numeric prefixes (e.g., `001_`, `002_`) to control execution order.
 
-CSV and Markdown files are generated alongside JSON for human readability and backward compatibility:
-- `results.csv`: Tabular query metrics with metadata as comments
-- `results.md`: Formatted report with tables and summary statistics
-- `data_load.csv`: Per-file data load metrics
+**Schema layering**: Project-level schemas are applied first, then variant-level schemas.
 
-All formats are written to: `projects/<project>/results/<config>/<run>/<variant>/`
+### Section: `data`
 
-## Comparing Results
+Data loading configuration.
 
-To compare two sets of results, run the following command (accepts JSON, CSV, or directory paths):
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `load_method` | string | Yes | - | Loading method (currently only `"http"` supported) |
+| `truncate_before_load` | boolean | No | false | TRUNCATE tables before loading data |
+| `load` | array | Yes | - | List of table/file mappings |
+| `load[].table` | string | Yes | - | Target table name |
+| `load[].file` | string | Yes | - | Data file name (relative to `data/` or `variants/<variant>/data/`) |
+| `load[].format` | string | Yes | - | ClickHouse format (e.g., `CSVWithNames`, `Parquet`, `JSONEachRow`) |
 
-```bash
-python -m harness.cli compare \
-  projects/default/results/results_default.csv \
-  projects/default/results/results_variant1.csv \
-  --output projects/default/results/comparison.md
+**Data file resolution**: Files are searched in variant-level `data/` first, then project-level `data/`.
+
+**Data loading metrics**: Load performance (throughput, duration) is captured in `data_load.json` and `data_load.csv`.
+
+### Section: `workload`
+
+Query workload configuration.
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `name` | string | Yes | - | Workload name (for reporting) |
+| `path` | string | Yes | - | Workload directory name under `workloads/` |
+| `queries` | array | Yes | - | List of query definitions |
+| `queries[].file` | string | Yes | - | Query filename (relative to `workloads/<path>/`) |
+| `queries[].weight` | integer | No | 1 | Query selection weight (higher = more frequent) |
+| `queries[].params` | object | No | {} | Query parameters (see Parameterized Queries) |
+| `concurrency` | integer | Yes | - | Number of concurrent clients |
+| `duration_seconds` | integer | Yes | - | Benchmark duration (excludes warmup and ramp-up) |
+| `ramp_up_seconds` | integer | No | 0 | Gradual concurrency ramp-up period |
+| `warmup_queries` | integer | No | 0 | Number of warmup queries to execute (excluded from metrics) |
+| `think_time_ms` | integer | No | 0 | Delay between queries per client (milliseconds) |
+| `max_errors` | integer | No | 100 | Abort benchmark after this many errors |
+| `query_timeout_seconds` | integer | No | 60 | Per-query timeout |
+
+**Query selection**: Queries are randomly selected based on weights. Weight of 10 means 10x more likely to be selected than weight of 1.
+
+**Query file resolution**: Files are searched in variant-level `workloads/<path>/` first, then project-level `workloads/<path>/`.
+
+**Parameterized queries**: Use `{param_name}` in SQL. Provide `params` with generator config:
+
+```yaml
+queries:
+  - file: "lookup.sql"
+    params:
+      user_id:
+        type: "random_int"
+        min: 1
+        max: 1000000
 ```
 
-## Creating a New Project
+See `parameter_generator.py` for supported parameter types.
 
-To create a new project:
+### Section: `metrics`
 
-1. Copy the `projects/default` directory to a new project directory: `projects/<your_project>`
-2. Add your schemas, data, and workloads to the corresponding directories
-3. Create a config for your project under `projects/<your_project>/configs/`
-4. Run the full benchmark using:
+Metrics collection configuration.
 
-```bash
-python -m harness.cli full-run --config projects/<your_project>/configs/<your_config>.yml
-```
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `use_query_log` | boolean | Yes | - | Collect metrics from system.query_log |
+| `query_log_wait_seconds` | integer | No | 10 | Wait time after workload for query_log flush |
 
-## Multi-Variant Support
+**Note**: Legacy `output_csv`, `output_md`, and `data_output_csv` fields are ignored. Output paths are automatically determined based on the results directory structure.
 
-Variants are the core concept of this benchmarking harness. A variant represents a different schema design (or data configuration) that you want to benchmark. The harness allows you to compare performance across multiple schema variants by running the same workload against each one.
+### Multi-Variant Configuration
 
-For example, you might have variants for:
-- Different indexing strategies
-- Alternative table engines (MergeTree vs ReplacingMergeTree)
-- Varied partitioning schemes
-- Different compression codecs
-
-### Project vs Variant Files
-
-The harness uses a layered approach to compose the final configuration:
-
-- **Project-level files** (`projects/<project>/schemas/`, `projects/<project>/data/`): Shared across all variants. Use these for dimensions, dictionaries, lookup tables, existing production seeders, and any variant-invariant data or schema elements.
-
-- **Variant-level files** (`projects/<project>/variants/<variant>/schemas/`, `projects/<project>/variants/<variant>/data/`): Specific to each variant. Use these for the schema and data that differ between variants.
-
-The final configuration for a variant = project files + variant files.
-
-By default, running a full benchmark executes all defined variants sequentially. When running a full benchmark (`full-run`), you can specify a `--variant` flag to run only that variant.
-
-### Example variant configuration:
+To benchmark multiple variants in a single run, define them in your config:
 
 ```yaml
 variants:
-  default:
-    description: "Baseline configuration"
-    data:
-      load:
-        - table: events
-          file: events_1k.csv
+  baseline:
+    description: "Standard MergeTree"
 
-  large:
-    description: "Large dataset"
-    data:
-      load:
-        - table: events
-          file: events_1m.csv
+  optimized:
+    description: "With secondary indexes"
+    # Variant-specific overrides can go here
+
+  partitioned:
+    description: "Partitioned by day"
 ```
 
-To run a specific variant:
+Run all variants:
 
 ```bash
-python -m harness.cli full-run --config projects/default/configs/example_basic.yml --variant large
+python -m harness.cli full-run --config projects/myproject/configs/example.yml
 ```
 
-## Conclusion
+Run a specific variant:
 
-This ClickHouse Benchmarking Harness provides a flexible and scalable approach for performance testing across multiple variants and configurations. With clear isolation between variants and results, and automated reporting, this tool allows for streamlined benchmarking and comparative analysis.
+```bash
+python -m harness.cli full-run --config projects/myproject/configs/example.yml --variant optimized
+```
+
+## CLI Commands
+
+### `full-run`
+
+Run complete benchmark: schema, data, workload, and reporting.
+
+```bash
+python -m harness.cli full-run --config <path> [--variant <name>] [--run-name <name>] [--verbose]
+```
+
+**Arguments**:
+- `--config`: Path to YAML configuration file (required)
+- `--variant`: Run specific variant only (default: all variants defined in config)
+- `--run-name`: Custom run name (default: auto-generated memorable name like "brave-penguin")
+- `--verbose`: Enable DEBUG logging
+
+**Behavior**:
+1. Validates configuration and connectivity
+2. For each variant:
+   - Applies schema (project-level + variant-level)
+   - Loads data
+   - Runs workload
+   - Collects metrics
+   - Generates reports (JSON, CSV, MD)
+3. Generates N-way comparison report if multiple variants ran
+
+**Output**: `projects/<project>/results/<config>/<run>/<variant>/`
+
+### `validate`
+
+Validate configuration and connectivity without running benchmarks.
+
+```bash
+python -m harness.cli validate --config <path> [--variant <name>] [--verbose]
+```
+
+**Checks**:
+- YAML syntax and required fields
+- ClickHouse connectivity
+- Schema files exist and are readable
+- Data files exist and are readable
+- Query files exist and are readable
+
+### `init-db`
+
+Apply schemas only (no data loading or workload execution).
+
+```bash
+python -m harness.cli init-db --config <path> [--variant <name>] [--verbose]
+```
+
+**Use cases**:
+- Verify schema syntax
+- Set up database for manual testing
+- Debug schema application issues
+
+### `load-data`
+
+Load data only (assumes schema already exists).
+
+```bash
+python -m harness.cli load-data --config <path> [--variant <name>] [--verbose]
+```
+
+**Use cases**:
+- Reload data without recreating schema
+- Test data loading performance
+- Debug data loading issues
+
+### `run-workload`
+
+Run workload only (assumes schema and data already exist).
+
+```bash
+python -m harness.cli run-workload --config <path> [--variant <name>] [--run-name <name>] [--verbose]
+```
+
+**Use cases**:
+- Re-run workload with same schema/data
+- Test different workload configurations
+- Quick iteration on query performance
+
+### `compare`
+
+Generate comparison report between two result sets.
+
+```bash
+python -m harness.cli compare <path_a> <path_b> --output <output_path>
+```
+
+**Arguments**:
+- `<path_a>`: First results file (JSON or CSV) or directory
+- `<path_b>`: Second results file (JSON or CSV) or directory
+- `--output`: Output path for comparison report (Markdown)
+
+**Note**: `full-run` automatically generates N-way comparison reports when multiple variants are run.
+
+## Output Formats
+
+All benchmarks generate multiple output formats for different use cases.
+
+### JSON (Canonical Format)
+
+`results.json` - Machine-readable workload metrics:
+
+```json
+{
+  "schema_version": "1.0",
+  "metadata": {
+    "project": "myproject",
+    "variant": "baseline",
+    "workload": "baseline",
+    "config_name": "example",
+    "run_name": "bold-penguin",
+    "timestamp": "2025-12-07T23:08:42.123456",
+    "duration_seconds": 120,
+    "concurrency": 8
+  },
+  "queries": [
+    {
+      "query_name": "q01_point_lookup.sql",
+      "count": 15234,
+      "errors": 0,
+      "error_rate": 0.0,
+      "qps": 127.12,
+      "p50_ms": 8.52,
+      "p95_ms": 14.58,
+      "p99_ms": 18.34,
+      "avg_query_duration_ms": 9.23,
+      "avg_read_rows": 1245,
+      "avg_read_bytes": 52341,
+      "avg_memory_usage": 1048576
+    }
+  ],
+  "summary": {
+    "total_queries": 15234,
+    "total_errors": 0,
+    "overall_qps": 127.12
+  }
+}
+```
+
+`data_load.json` - Data loading metrics:
+
+```json
+{
+  "schema_version": "1.0",
+  "metadata": {
+    "project": "myproject",
+    "variant": "baseline",
+    "load_method": "http"
+  },
+  "totals": {
+    "files_loaded": 2,
+    "total_rows": 1000000,
+    "total_bytes": 52428800,
+    "total_duration_seconds": 12.34,
+    "overall_throughput_mb_per_sec": 4.05
+  },
+  "ingest": [
+    {
+      "table": "events",
+      "file": "events.csv",
+      "format": "CSVWithNames",
+      "rows": 900000,
+      "bytes": 47185920,
+      "duration_seconds": 11.23,
+      "throughput_mb_per_sec": 4.01
+    }
+  ]
+}
+```
+
+### CSV Format
+
+`results.csv` - Tabular query metrics with metadata as comments:
+
+```csv
+# project: myproject
+# variant: baseline
+# workload: baseline
+# timestamp: 2025-12-07T23:08:42
+query_name,count,errors,error_rate,qps,p50_ms,p95_ms,p99_ms,avg_query_duration_ms,avg_read_rows,avg_read_bytes,avg_memory_usage
+q01_point_lookup.sql,15234,0,0.0,127.12,8.52,14.58,18.34,9.23,1245,52341,1048576
+```
+
+`data_load.csv` - Per-file load metrics:
+
+```csv
+# project: myproject
+# variant: baseline
+table,file,format,rows,bytes,duration_seconds,throughput_mb_per_sec
+events,events.csv,CSVWithNames,900000,47185920,11.23,4.01
+```
+
+### Markdown Format
+
+`results.md` - Human-readable formatted report with tables and summary statistics.
+
+### Comparison Reports
+
+`comparison_all_variants.md` - N-way comparison across all variants (generated automatically by `full-run`):
+
+```markdown
+# N-Way Benchmark Comparison
+
+**Variants Compared**: 3 variants
+
+| Variant | Results Path |
+|---------|--------------|
+| baseline | `/path/to/results/baseline/results.json` |
+| optimized | `/path/to/results/optimized/results.json` |
+| partitioned | `/path/to/results/partitioned/results.json` |
+
+## Executive Summary
+
+**Overall Winner**: optimized
+
+**Win Distribution** (based on p50 latency):
+- optimized: 8 queries (80.0%)
+- baseline: 2 queries (20.0%)
+- partitioned: 0 queries (0.0%)
+
+## Section 1: Side-by-Side Performance Comparison
+
+### Query: q01_point_lookup.sql
+
+| Metric | baseline | optimized | partitioned | Best | Δ (baseline) | Δ (optimized) | Δ (partitioned) |
+|--------|----------|-----------|-------------|------|--------------|---------------|-----------------|
+| p50 (ms) | 8.52 | 6.23 | 9.12 | optimized | +36.8% | - | +46.4% |
+| p95 (ms) | 14.58 | 11.34 | 15.67 | optimized | +28.6% | - | +38.2% |
+| QPS | 429.24 | 587.45 | 401.23 | optimized | -26.9% | - | -31.7% |
+
+## Section 2: Rankings
+
+### Ranking by p50 Latency (Average Across All Queries)
+
+| Rank | Variant | Avg p50 Latency (ms) | Relative to Best |
+|------|---------|----------------------|------------------|
+| 1 | optimized | 6.23 | - |
+| 2 | baseline | 8.52 | +36.8% |
+| 3 | partitioned | 9.12 | +46.4% |
+```
+
+## Comparing Results
+
+When you run `full-run` with multiple variants, an N-way comparison report is automatically generated at:
+
+```
+projects/<project>/results/<config>/<run>/comparison_all_variants.md
+```
+
+This report includes:
+- Side-by-side tables showing all variants for each query
+- Rankings by p50, p95, and QPS
+- Percentage deltas relative to best performer
+- Executive summary with overall winner
+
+To manually compare specific results:
+
+```bash
+python -m harness.cli compare \
+  projects/myproject/results/example/run1/baseline/results.json \
+  projects/myproject/results/example/run2/baseline/results.json \
+  --output comparison.md
+```
+
+The comparison accepts:
+- JSON files (`results.json`)
+- CSV files (`results.csv`)
+- Directories (will find `results.json` automatically)
+
+## Creating a New Project
+
+1. **Create project directory structure**:
+
+```bash
+mkdir -p projects/myproject/{configs,schemas,data,workloads/baseline,variants/baseline/schemas,results}
+```
+
+2. **Create a minimal config** at `projects/myproject/configs/example.yml`:
+
+```yaml
+project: "myproject"
+variant: "baseline"
+
+clickhouse:
+  host: "localhost"
+  port: 8123
+  user: "default"
+  password: ""
+  database: "myproject_bench"
+
+schema:
+  fresh: true
+
+data:
+  load_method: "http"
+  load: []
+
+workload:
+  name: "baseline"
+  path: "baseline"
+  queries:
+    - file: "query.sql"
+  concurrency: 4
+  duration_seconds: 60
+
+metrics:
+  use_query_log: true
+```
+
+3. **Add schema** at `projects/myproject/variants/baseline/schemas/001_create_table.sql`:
+
+```sql
+CREATE TABLE events (
+    timestamp DateTime,
+    user_id UInt64,
+    event_type String
+) ENGINE = MergeTree()
+ORDER BY (timestamp, user_id);
+```
+
+4. **Add query** at `projects/myproject/workloads/baseline/query.sql`:
+
+```sql
+SELECT count() FROM events WHERE timestamp > now() - INTERVAL 1 HOUR;
+```
+
+5. **Run the benchmark**:
+
+```bash
+python -m harness.cli full-run --config projects/myproject/configs/example.yml
+```
+
+6. **View results**:
+
+```bash
+cat projects/myproject/results/example/*/baseline/results.md
+```
+
+## Best Practices
+
+### Schema Variant Design
+
+When creating schema variants to test:
+
+1. **Change one thing at a time** - Isolate variables to understand impact
+2. **Keep queries identical** - Use project-level workloads when possible
+3. **Use descriptive variant names** - `baseline`, `with_bloom_filter`, `partitioned_by_day`
+4. **Document variants** - Add comments in schema files explaining the design choice
+
+### Workload Design
+
+For realistic benchmarks:
+
+1. **Use production query patterns** - Extract real queries from your application
+2. **Weight queries appropriately** - Match production frequency distribution
+3. **Include warmup** - Let ClickHouse populate caches naturally
+4. **Run long enough** - 2-5 minutes minimum for stable metrics
+5. **Use realistic concurrency** - Match expected production load
+
+### Data Loading
+
+1. **Use representative data** - Real or realistic synthetic data
+2. **Match production scale** - Or scale proportionally
+3. **Consider data distribution** - Cardinality, skew, and patterns matter
+4. **Seed data consistently** - For reproducible benchmarks
+
+### Interpreting Results
+
+1. **Look at percentiles, not just averages** - p95 and p99 matter for user experience
+2. **Consider throughput** - QPS shows overall capacity
+3. **Check resource usage** - Memory and bytes read indicate efficiency
+4. **Run multiple times** - Verify consistency before making decisions
+5. **Compare like-to-like** - Same data, same workload, same hardware
+
+## Troubleshooting
+
+### ClickHouse Connection Issues
+
+```
+Error: Could not connect to ClickHouse at localhost:8123
+```
+
+**Solutions**:
+- Verify ClickHouse is running: `curl http://localhost:8123`
+- Check host/port in config
+- Verify user/password credentials
+- Check firewall rules
+
+### Schema Application Failures
+
+```
+Error: Schema file failed to execute: 001_create_table.sql
+```
+
+**Solutions**:
+- Check SQL syntax in schema file
+- Verify table doesn't already exist (or use `fresh: true`)
+- Check user has CREATE permissions
+- Review ClickHouse error message in logs (`--verbose`)
+
+### Data Loading Failures
+
+```
+Error: Data load failed for table 'events'
+```
+
+**Solutions**:
+- Verify table exists (run `init-db` first)
+- Check data file format matches declared format
+- Verify file encoding (UTF-8 expected)
+- Check for data type mismatches
+- Use `--verbose` to see detailed error messages
+
+### Metrics Collection Issues
+
+```
+Warning: No metrics found in query_log
+```
+
+**Solutions**:
+- Ensure `system.query_log` is enabled in ClickHouse config
+- Increase `query_log_wait_seconds` in config
+- Check user has SELECT permission on system.query_log
+- Verify queries are actually executing (check for errors)
+
+## Advanced Topics
+
+### Custom Parameter Generators
+
+Create custom parameter types by extending `parameter_generator.py`:
+
+```python
+@parameter_generator("custom_type")
+def generate_custom(config: dict) -> Any:
+    # Your generator logic
+    return generated_value
+```
+
+### Integration with CI/CD
+
+Run regression benchmarks in CI:
+
+```bash
+# Run benchmark
+python -m harness.cli full-run --config projects/myproject/configs/ci.yml --run-name "commit-${GIT_SHA}"
+
+# Check for regressions
+python scripts/check_regression.py \
+  projects/myproject/results/ci/commit-${PREV_SHA}/baseline/results.json \
+  projects/myproject/results/ci/commit-${GIT_SHA}/baseline/results.json \
+  --threshold 5  # Fail if p95 regressed by >5%
+```
+
+### Distributed ClickHouse
+
+For distributed tables, adjust your schema and queries accordingly:
+
+```sql
+-- Schema variant: distributed
+CREATE TABLE events_local ON CLUSTER cluster (
+    ...
+) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/events', '{replica}')
+...;
+
+CREATE TABLE events ON CLUSTER cluster AS events_local
+ENGINE = Distributed(cluster, currentDatabase(), events_local, rand());
+```
+
+Query against the distributed table in your workload.
+
+## Contributing
+
+Contributions welcome. Please:
+
+1. Follow existing code style
+2. Add tests for new features
+3. Update documentation
+4. Submit pull requests with clear descriptions
+
+## License
+
+[Add your license here]
