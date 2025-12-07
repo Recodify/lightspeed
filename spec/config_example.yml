@@ -1,5 +1,4 @@
 project: default
-variant: default  # Change this to test different variants
 
 clickhouse:
   host: localhost
@@ -21,6 +20,19 @@ data:
     - table: events
       file: sample.csv
       format: CSVWithNames
+
+variants:
+  - default:
+    description:
+      data:
+        load_method: insert
+        truncate_before_load: false
+        load:
+          - table: events
+            file: sample.csv
+            format: CSVWithNames
+  - variant1:
+      description:
 
 workload:
   name: basic_benchmark

@@ -55,3 +55,8 @@ ch-harness/
             ...
         variants/
     etc
+
+
+## examples
+
+python -m harness.cli full-run --config projects/default/configs/example_basic.yml
