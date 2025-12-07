@@ -143,13 +143,22 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
 
 ---
 
-### 6. Data Loader ✅
+### 6. Data Loader ✅ (Verified 2025-12-07)
 
 **File:** `harness/data_loader.py`
 
-- [x] Implement `resolve_data_file(filename: str, project_root: Path, variant_root: Path) -> Path`
-  - Try `variant_root/data/{filename}` first
-  - Fallback to `project_root/data/{filename}`
+**Note:** Implementation verified against `spec/appendices/dataloading.md` specification. All requirements correctly implemented including:
+- Resolution algorithm (project first, then variant)
+- At least one file must exist validation
+- Deterministic load order (project → variant)
+- Target table always from config (never inferred from filename)
+- CSV header handling via CSVWithNames
+- Streaming without client-side parsing
+
+- [x] Implement `collect_data_files(filename: str, project_root: Path, variant_root: Path) -> list[tuple[Path, str]]`
+  - Check `project_root/data/{filename}` first
+  - Check `variant_root/data/{filename}` second
+  - Return list of (path, source) tuples for all existing files in load order
   - Raise `DataLoadError` if neither exists
 
 - [x] Implement `load_data(config: BenchmarkConfig, client: ClickHouseClient, project_root: Path, variant_root: Path)`
@@ -251,29 +260,29 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
 
 ---
 
-### 9. Metrics Collector
+### 9. Metrics Collector ✅
 
 **File:** `harness/metrics_collector.py`
 
-- [ ] Implement `collect_query_log_metrics(config: BenchmarkConfig, client: ClickHouseClient, execution_records: list[ExecutionRecord], start_time: datetime, end_time: datetime) -> dict`
+- [x] Implement `collect_query_log_metrics(config: BenchmarkConfig, client: ClickHouseClient, execution_records: list[ExecutionRecord], start_time: datetime, end_time: datetime) -> dict`
 
-- [ ] Sleep for `query_log_wait_seconds`
+- [x] Sleep for `query_log_wait_seconds`
 
-- [ ] Extract all query_ids from execution_records
+- [x] Extract all query_ids from execution_records
 
-- [ ] Query `system.query_log`:
+- [x] Query `system.query_log`:
   - Filter: `type = 'QueryFinish'`
   - Filter: `query_id IN (...)`
   - Filter: `event_time >= start_time AND event_time <= end_time`
   - Select: `query_id`, `query_duration_ms`, `read_rows`, `read_bytes`, `result_rows`, `result_bytes`, `memory_usage`
 
-- [ ] Build mapping: `query_id -> metrics dict`
+- [x] Build mapping: `query_id -> metrics dict`
 
-- [ ] Check for mismatches:
+- [x] Check for mismatches:
   - If fewer entries than executions: log warning
   - If more entries than executions: log warning about duplicates, deduplicate by taking latest
 
-- [ ] Return metrics mapping
+- [x] Return metrics mapping
 
 ---
 
