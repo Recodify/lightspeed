@@ -12,37 +12,37 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
 
 ## Task Breakdown
 
-### 1. Project Setup
+### 1. Project Setup ✅
 
 **File:** `pyproject.toml`
 
-- [ ] Create pyproject.toml with dependencies:
+- [x] Create pyproject.toml with dependencies:
   - httpx>=0.27.0
   - pyyaml>=6.0
   - pydantic>=2.0.0
   - pandas>=2.0.0
-- [ ] Add dev dependencies (pytest, black, ruff)
-- [ ] Configure project metadata (name, version)
+- [x] Add dev dependencies (pytest, black, ruff)
+- [x] Configure project metadata (name, version)
 
 **Files:** Repository structure
 
-- [ ] Create `harness/` package directory
-- [ ] Create `projects/default/` example project
-- [ ] Create subdirectories: `configs/`, `schemas/`, `data/`, `workloads/`, `variants/`, `results/`
-- [ ] Add `__init__.py` files to Python packages
+- [x] Create `harness/` package directory
+- [x] Create `projects/default/` example project
+- [x] Create subdirectories: `configs/`, `schemas/`, `data/`, `workloads/`, `variants/`, `results/`
+- [x] Add `__init__.py` files to Python packages
 
 ---
 
-### 2. Exception Definitions
+### 2. Exception Definitions ✅
 
 **File:** `harness/exceptions.py`
 
-- [ ] Define `HarnessError` base exception
-- [ ] Define `ValidationError` for config/file validation failures
-- [ ] Define `SchemaLoadError` for schema execution failures
-- [ ] Define `DataLoadError` for data loading failures
-- [ ] Define `WorkloadAbortedError` for max_errors threshold exceeded
-- [ ] Define `MetricsCollectionError` for query_log issues
+- [x] Define `HarnessError` base exception
+- [x] Define `ValidationError` for config/file validation failures
+- [x] Define `SchemaLoadError` for schema execution failures
+- [x] Define `DataLoadError` for data loading failures
+- [x] Define `WorkloadAbortedError` for max_errors threshold exceeded
+- [x] Define `MetricsCollectionError` for query_log issues
 
 ---
 
