@@ -10,9 +10,17 @@ def setup_logging(verbose: bool) -> None:
         verbose: If True, set log level to DEBUG; otherwise INFO
     """
     level = logging.DEBUG if verbose else logging.INFO
+
+    # Use different format for verbose vs normal mode
+    # Verbose: show module names, Normal: clean output
+    if verbose:
+        log_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    else:
+        log_format = "%(message)s"
+
     logging.basicConfig(
         level=level,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        format=log_format,
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 

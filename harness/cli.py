@@ -211,53 +211,73 @@ def cmd_full_run(args: argparse.Namespace) -> int:
     """
     try:
         logger.debug(f"Loading configuration from {args.config}")
-        config = load_config(args.config)
+        base_config = load_config(args.config)
 
-        # Resolve variant
-        config = resolve_variant_config(config, args.variant)
+        # Determine which variants to run
+        # If --variant is explicitly provided, run only that variant
+        # If --variant is not provided and config has variants, run ALL variants
+        # If --variant is not provided and config has no variants, use "default"
 
-        # High-level banner
-        logger.info("=" * 60)
-        logger.info(f"Starting benchmark: {config.project} / {config.variant}")
-        logger.info(f"Workload: {config.workload.name} ({config.workload.concurrency} workers, {config.workload.duration_seconds}s)")
-        logger.info("=" * 60)
-
-        # If dry-run, only validate
-        if args.dry_run:
-            logger.info("Dry-run mode: validating only")
-            return cmd_validate(args)
-
-        # Step 1: Validate
-        logger.info("[1/4] Validating configuration...")
-        if cmd_validate(args) != 0:
-            logger.error("Validation failed, aborting")
-            return 1
-
-        # Step 2: Initialize database if fresh schema requested
-        if config.schema.fresh:
-            logger.info("[2/4] Initializing database (fresh schema)...")
-            if cmd_init_db(args) != 0:
-                logger.error("Schema initialization failed, aborting")
-                return 1
+        if hasattr(args, 'variant') and args.variant != "default":
+            # User explicitly specified a variant
+            variants_to_run = [args.variant]
+        elif base_config.variants is not None:
+            # Config has variants, run all of them
+            variants_to_run = list(base_config.variants.keys())
+            logger.info(f"Running all variants: {', '.join(variants_to_run)}")
         else:
-            logger.info("[2/4] Skipping schema initialization (fresh=False)")
+            # No variants in config, use default
+            variants_to_run = ["default"]
 
-        # Step 3: Load data
-        logger.info("[3/4] Loading data...")
-        if cmd_load_data(args) != 0:
-            logger.error("Data loading failed, aborting")
-            return 1
+        # Run each variant
+        for variant_name in variants_to_run:
+            # Resolve variant
+            config = resolve_variant_config(base_config, variant_name)
 
-        # Step 4: Run workload
-        logger.info("[4/4] Running workload...")
-        if cmd_run_workload(args) != 0:
-            logger.error("Workload execution failed, aborting")
-            return 1
+            # High-level banner
+            logger.info("=" * 60)
+            logger.info(f"Starting benchmark: {config.project} / {config.variant}")
+            logger.info(f"Workload: {config.workload.name} ({config.workload.concurrency} workers, {config.workload.duration_seconds}s)")
+            logger.info("=" * 60)
 
-        logger.info("=" * 60)
-        logger.info(f"Benchmark completed: {config.variant}")
-        logger.info(f"Results: projects/{config.project}/results/results_{config.variant}.csv")
-        logger.info("=" * 60)
+            # If dry-run, only validate
+            if args.dry_run:
+                logger.info("Dry-run mode: validating only")
+                return cmd_validate(args)
+
+            # Step 1: Validate
+            logger.info("[1/4] Validating configuration...")
+            if cmd_validate(args) != 0:
+                logger.error("Validation failed, aborting")
+                return 1
+
+            # Step 2: Initialize database if fresh schema requested
+            if config.schema.fresh:
+                logger.info("[2/4] Initializing database (fresh schema)...")
+                if cmd_init_db(args) != 0:
+                    logger.error("Schema initialization failed, aborting")
+                    return 1
+            else:
+                logger.info("[2/4] Skipping schema initialization (fresh=False)")
+
+            # Step 3: Load data
+            logger.info("[3/4] Loading data...")
+            if cmd_load_data(args) != 0:
+                logger.error("Data loading failed, aborting")
+                return 1
+
+            # Step 4: Run workload
+            logger.info("[4/4] Running workload...")
+            if cmd_run_workload(args) != 0:
+                logger.error("Workload execution failed, aborting")
+                return 1
+
+            logger.info("=" * 60)
+            logger.info(f"Benchmark completed: {config.variant}")
+            logger.info(f"Results: projects/{config.project}/results/results_{config.variant}.csv")
+            logger.info("=" * 60)
+
+        # All variants completed successfully
         return 0
 
     except HarnessError as e:
