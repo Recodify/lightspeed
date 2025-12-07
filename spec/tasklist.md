@@ -182,11 +182,11 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
 
 ---
 
-### 8. Workload Runner
+### 8. Workload Runner ✅
 
 **File:** `harness/workload_runner.py`
 
-- [ ] Implement `load_queries(config: WorkloadConfig, project_root: Path, variant_root: Path) -> list[dict]`
+- [x] Implement `load_queries(config: WorkloadConfig, project_root: Path, variant_root: Path) -> list[dict]`
   - If `config.queries` is specified (explicit mode):
     - For each query entry:
       - Resolve file: try `variant_root/workloads/{path}/{file}` then `project_root/workloads/{path}/{file}`
@@ -197,11 +197,11 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
     - If same filename in both, variant wins
     - Return list with weight=1 for all
 
-- [ ] Implement `build_weighted_pool(queries: list[dict]) -> list[dict]`
+- [x] Implement `build_weighted_pool(queries: list[dict]) -> list[dict]`
   - For each query, duplicate it `weight` times in pool
   - Return flattened list for random selection
 
-- [ ] Define `ExecutionRecord` dataclass:
+- [x] Define `ExecutionRecord` dataclass:
   - `query_id: str`
   - `query_name: str`
   - `executed_sql: str`
@@ -211,7 +211,7 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
   - `success: bool`
   - `error_message: str | None`
 
-- [ ] Implement `run_warmup(warmup_queries: int, query_pool: list, client: ClickHouseClient, param_config: dict | None)`
+- [x] Implement `run_warmup(warmup_queries: int, query_pool: list, client: ClickHouseClient, param_config: dict | None)`
   - For i in range(warmup_queries):
     - Select random query from pool
     - Generate parameters
@@ -219,7 +219,7 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
     - Execute (ignore results, ignore errors)
     - Log progress every N queries
 
-- [ ] Implement `worker_func(config: WorkloadConfig, query_pool: list, client: ClickHouseClient, param_config: dict | None, stop_event: threading.Event, error_counter: SharedCounter) -> list[ExecutionRecord]`
+- [x] Implement `worker_func(config: WorkloadConfig, query_pool: list, client: ClickHouseClient, param_config: dict | None, stop_event: threading.Event, error_counter: SharedCounter) -> list[ExecutionRecord]`
   - Loop while not stopped and duration not exceeded:
     - Check if `error_counter > max_errors`, set stop_event if so
     - Select random query
@@ -235,7 +235,7 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
     - Sleep `think_time_ms` if configured
   - Return list of ExecutionRecords
 
-- [ ] Implement `run_workload(config: BenchmarkConfig, project_root: Path, variant_root: Path) -> dict`
+- [x] Implement `run_workload(config: BenchmarkConfig, project_root: Path, variant_root: Path) -> dict`
   - Load queries (explicit or auto-discover)
   - Build weighted pool
   - Create workload-specific httpx client with `query_timeout_seconds`

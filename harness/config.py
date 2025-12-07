@@ -226,6 +226,9 @@ def validate_data_files(
     """
     Validate that data files exist per resolution rules.
 
+    Project data is loaded first, variant data supplements it.
+    At least one must exist.
+
     Args:
         config: Benchmark configuration
         project_root: Project root directory
@@ -238,11 +241,15 @@ def validate_data_files(
         variant_path = variant_root / "data" / entry.file
         project_path = project_root / "data" / entry.file
 
-        if variant_path.exists():
-            logger.info(f"Data file found (variant): {variant_path}")
-        elif project_path.exists():
+        found_project = project_path.exists()
+        found_variant = variant_path.exists()
+
+        if found_project:
             logger.info(f"Data file found (project): {project_path}")
-        else:
+        if found_variant:
+            logger.info(f"Data file found (variant): {variant_path}")
+
+        if not found_project and not found_variant:
             raise ValidationError(
                 f"Data file not found: {entry.file} "
                 f"(checked {variant_path} and {project_path})"

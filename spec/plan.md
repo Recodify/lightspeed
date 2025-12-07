@@ -153,9 +153,11 @@ Each `.sql` file is executed as a single statement via HTTP (no splitting by sem
 
 For each `data.load` entry with `file: "<name>"`:
 
-1. Try variant-specific: `VARIANT_ROOT/data/<file>`
-2. If not found, try project-wide: `PROJECT_ROOT/data/<file>`
-3. If neither exists, validation fails
+1. Load project-wide data if exists: `PROJECT_ROOT/data/<file>`
+2. Load variant-specific data as supplement if exists: `VARIANT_ROOT/data/<file>`
+3. At least one must exist, otherwise validation fails
+
+**Rationale:** Project data is the base dataset, variant data supplements it (adds more rows to the same table). This allows variants to test with larger datasets or additional data scenarios while maintaining the base project data.
 
 ### Workload Queries
 
