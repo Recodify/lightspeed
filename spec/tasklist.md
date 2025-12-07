@@ -115,18 +115,18 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
 
 ---
 
-### 5. Schema Loader
+### 5. Schema Loader ✅
 
 **File:** `harness/schema_loader.py`
 
-- [ ] Implement `apply_schema(config: BenchmarkConfig, client: ClickHouseClient, project_root: Path, variant_root: Path)`
+- [x] Implement `apply_schema(config: BenchmarkConfig, client: ClickHouseClient, project_root: Path, variant_root: Path)`
 
-- [ ] If `config.schema.fresh` is True:
+- [x] If `config.schema.fresh` is True:
   - Execute `DROP DATABASE IF EXISTS {database}`
   - Execute `CREATE DATABASE {database}`
   - Log actions
 
-- [ ] Load project-wide schemas:
+- [x] Load project-wide schemas:
   - Find all `*.sql` in `project_root/schemas/` (sorted)
   - For each file:
     - Read entire file
@@ -135,11 +135,11 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
     - If fails and `fail_on_error=True`, raise `SchemaLoadError`
     - If fails and `fail_on_error=False`, log warning and continue
 
-- [ ] Load variant-specific schemas:
+- [x] Load variant-specific schemas:
   - Find all `*.sql` in `variant_root/schemas/` (sorted)
   - Same execution logic as project-wide
 
-- [ ] Return summary (files executed, failures)
+- [x] Return summary (files executed, failures)
 
 ---
 
