@@ -56,14 +56,12 @@ class ClickHouseClient:
     def execute(
         self,
         sql: str,
-        params: dict[str, Any] | None = None,
         settings: dict[str, Any] | None = None
     ) -> list[dict[str, Any]]:
         """Execute SQL query and return results as list of dicts.
 
         Args:
             sql: SQL query to execute
-            params: Optional query parameters (for prepared statements)
             settings: Optional ClickHouse settings (e.g., {"query_id": "..."})
 
         Returns:
@@ -101,14 +99,12 @@ class ClickHouseClient:
     def execute_no_result(
         self,
         sql: str,
-        params: dict[str, Any] | None = None,
         settings: dict[str, Any] | None = None
     ) -> None:
         """Execute SQL query without expecting results (DDL, DML).
 
         Args:
             sql: SQL query to execute
-            params: Optional query parameters
             settings: Optional ClickHouse settings
 
         Raises:
@@ -189,7 +185,7 @@ class ClickHouseClient:
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, _exc_type, _exc_val, _exc_tb):
         """Context manager exit - cleanup client."""
         self.client.close()
         logger.debug("ClickHouse client closed")

@@ -143,18 +143,18 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
 
 ---
 
-### 6. Data Loader
+### 6. Data Loader ✅
 
 **File:** `harness/data_loader.py`
 
-- [ ] Implement `resolve_data_file(filename: str, project_root: Path, variant_root: Path) -> Path`
+- [x] Implement `resolve_data_file(filename: str, project_root: Path, variant_root: Path) -> Path`
   - Try `variant_root/data/{filename}` first
   - Fallback to `project_root/data/{filename}`
   - Raise `DataLoadError` if neither exists
 
-- [ ] Implement `load_data(config: BenchmarkConfig, client: ClickHouseClient, project_root: Path, variant_root: Path)`
+- [x] Implement `load_data(config: BenchmarkConfig, client: ClickHouseClient, project_root: Path, variant_root: Path)`
 
-- [ ] For each entry in `config.data.load`:
+- [x] For each entry in `config.data.load`:
   - Resolve file path
   - If `truncate_before_load=True`: `TRUNCATE TABLE {table}`
   - Open file in binary mode
@@ -165,7 +165,7 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
   - Log: table name, file size, duration, success/failure
   - If fails, raise `DataLoadError`
 
-- [ ] Return summary (tables loaded, bytes transferred)
+- [x] Return summary (tables loaded, bytes transferred)
 
 ---
 
