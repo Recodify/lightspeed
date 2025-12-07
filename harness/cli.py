@@ -282,18 +282,6 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-    # Global arguments
-    parser.add_argument(
-        "--config",
-        type=str,
-        help="Path to configuration YAML file",
-    )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Enable verbose logging (DEBUG level)",
-    )
-
     # Subcommands
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -302,30 +290,40 @@ def main() -> int:
         "validate",
         help="Validate configuration and test ClickHouse connectivity",
     )
+    parser_validate.add_argument("--config", type=str, required=True, help="Path to configuration YAML file")
+    parser_validate.add_argument("--verbose", action="store_true", help="Enable verbose logging (DEBUG level)")
 
     # init-db command
     parser_init_db = subparsers.add_parser(
         "init-db",
         help="Initialize database schema",
     )
+    parser_init_db.add_argument("--config", type=str, required=True, help="Path to configuration YAML file")
+    parser_init_db.add_argument("--verbose", action="store_true", help="Enable verbose logging (DEBUG level)")
 
     # load-data command
     parser_load_data = subparsers.add_parser(
         "load-data",
         help="Load data into ClickHouse tables",
     )
+    parser_load_data.add_argument("--config", type=str, required=True, help="Path to configuration YAML file")
+    parser_load_data.add_argument("--verbose", action="store_true", help="Enable verbose logging (DEBUG level)")
 
     # run-workload command
     parser_run_workload = subparsers.add_parser(
         "run-workload",
         help="Run workload and collect metrics",
     )
+    parser_run_workload.add_argument("--config", type=str, required=True, help="Path to configuration YAML file")
+    parser_run_workload.add_argument("--verbose", action="store_true", help="Enable verbose logging (DEBUG level)")
 
     # full-run command
     parser_full_run = subparsers.add_parser(
         "full-run",
         help="Run complete benchmark (validate, init-db if fresh, load-data, run-workload)",
     )
+    parser_full_run.add_argument("--config", type=str, required=True, help="Path to configuration YAML file")
+    parser_full_run.add_argument("--verbose", action="store_true", help="Enable verbose logging (DEBUG level)")
     parser_full_run.add_argument(
         "--dry-run",
         action="store_true",
@@ -353,21 +351,16 @@ def main() -> int:
         required=True,
         help="Path for output Markdown comparison report",
     )
+    parser_compare.add_argument("--verbose", action="store_true", help="Enable verbose logging (DEBUG level)")
 
     # Parse arguments
     args = parser.parse_args()
 
     # Setup logging
-    setup_logging(args.verbose)
+    setup_logging(args.verbose if hasattr(args, 'verbose') else False)
 
     # Check if command was provided
     if not args.command:
-        parser.print_help()
-        return 1
-
-    # Check if config is provided (required for all commands except compare)
-    if args.command != "compare" and not args.config:
-        logger.error("--config is required")
         parser.print_help()
         return 1
 
