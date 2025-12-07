@@ -16,6 +16,11 @@ def setup_logging(verbose: bool) -> None:
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
+    # Suppress noisy third-party loggers unless in verbose mode
+    if not verbose:
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 
 def format_bytes(bytes_count: int) -> str:
     """Format bytes as human-readable string.

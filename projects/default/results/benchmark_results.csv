@@ -1,8 +1,0 @@
-# workload_start_epoch_ms: 1765109777490
-# workload_end_epoch_ms: 1765109787496
-# workload_elapsed_secs: 10.006
-# project: default
-# variant: default
-query_name,count,errors,error_rate,qps,p50_ms,p95_ms,p99_ms,avg_read_rows,avg_read_bytes,avg_memory_usage
-q01_simple.sql,1632,0,0.0000,163.10,10.20,19.61,30.54,20,266,5372105
-q02_aggregate.sql,1631,0,0.0000,163.00,12.03,21.05,29.15,20,426,5468023

@@ -1,0 +1,2 @@
+- Some of the code could do with a refactor.
+  -   e.g. comparator.py is one single, pretty chunky, function. Consider refactoring into other functions to reduce cognitive complexity.
