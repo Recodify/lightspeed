@@ -46,11 +46,11 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
 
 ---
 
-### 3. Configuration Module
+### 3. Configuration Module ✅
 
 **File:** `harness/config.py`
 
-- [ ] Define Pydantic models for config structure:
+- [x] Define Pydantic models for config structure:
   - `ClickHouseConfig` (host, port, user, password, database, connection_pool_size, timeout_seconds)
   - `SchemaConfig` (fail_on_error, fresh)
   - `DataLoadEntry` (table, file, format)
@@ -61,22 +61,22 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
   - `MetricsConfig` (use_query_log, query_log_wait_seconds, output_csv, output_md)
   - `BenchmarkConfig` (project, variant, clickhouse, schema, data, workload, metrics)
 
-- [ ] Implement `load_config(path: str) -> BenchmarkConfig`
+- [x] Implement `load_config(path: str) -> BenchmarkConfig`
   - Read YAML file
   - Parse with Pydantic
   - Return validated config object
 
-- [ ] Implement path computation:
+- [x] Implement path computation:
   - `compute_project_root(config) -> Path`
   - `compute_variant_root(config) -> Path`
 
-- [ ] Implement validation functions:
+- [x] Implement validation functions:
   - `validate_project_structure(config)` - check directories exist
   - `validate_schema_files(config, project_root, variant_root)` - check .sql files exist
   - `validate_data_files(config, project_root, variant_root)` - check data files exist
   - `validate_workload_files(config, project_root, variant_root)` - check query files exist (explicit or auto-discover)
 
-- [ ] Implement `validate_config(config)` - orchestrates all validation
+- [x] Implement `validate_config(config)` - orchestrates all validation
 
 ---
 
