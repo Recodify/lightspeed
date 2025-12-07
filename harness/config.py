@@ -98,6 +98,8 @@ class MetricsConfig(BaseModel):
 class BenchmarkConfig(BaseModel):
     """Complete benchmark configuration."""
 
+    model_config = {"protected_namespaces": ()}
+
     project: str
     variant: str
     clickhouse: ClickHouseConfig
