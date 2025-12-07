@@ -286,15 +286,15 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
 
 ---
 
-### 10. Reporter
+### 10. Reporter ✅
 
 **File:** `harness/reporter.py`
 
-- [ ] Implement `generate_reports(config: BenchmarkConfig, execution_records: list[ExecutionRecord], query_log_metrics: dict, workload_metadata: dict, project_root: Path)`
+- [x] Implement `generate_reports(config: BenchmarkConfig, execution_records: list[ExecutionRecord], query_log_metrics: dict, workload_metadata: dict, project_root: Path)`
 
-- [ ] Group execution_records by `query_name`
+- [x] Group execution_records by `query_name`
 
-- [ ] For each query, calculate:
+- [x] For each query, calculate:
   - `count` = total executions
   - `errors` = count where `success=False`
   - `error_rate = errors / count`
@@ -302,7 +302,7 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
   - `p50_ms`, `p95_ms`, `p99_ms` from `duration_ms` (use pandas.quantile or numpy.percentile)
   - `avg_read_rows`, `avg_read_bytes`, `avg_memory_usage` from query_log_metrics where available
 
-- [ ] Generate CSV:
+- [x] Generate CSV:
   - Prepend metadata as comments:
     - `# workload_start_epoch_ms: ...`
     - `# workload_end_epoch_ms: ...`
@@ -312,14 +312,14 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
   - Write header: `query_name,count,errors,error_rate,qps,p50_ms,p95_ms,p99_ms,avg_read_rows,avg_read_bytes,avg_memory_usage`
   - Write data rows
 
-- [ ] Generate Markdown:
+- [x] Generate Markdown:
   - Metadata section with formatted timestamps, project, variant, concurrency
   - Table with query performance metrics
   - Summary section with totals
 
-- [ ] Write files to `project_root/{output_csv}` and `project_root/{output_md}`
+- [x] Write files to `project_root/{output_csv}` and `project_root/{output_md}`
 
-- [ ] Log output file paths
+- [x] Log output file paths
 
 ---
 
