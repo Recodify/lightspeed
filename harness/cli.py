@@ -36,25 +36,25 @@ def cmd_validate(args: argparse.Namespace) -> int:
         Exit code (0 for success, 1 for failure)
     """
     try:
-        logger.info(f"Loading configuration from {args.config}")
+        logger.debug(f"Loading configuration from {args.config}")
         config = load_config(args.config)
 
         # Resolve variant
         config = resolve_variant_config(config, args.variant)
 
-        logger.info("Validating configuration...")
+        logger.debug("Validating configuration...")
         validate_config(config)
-        logger.info("Configuration validation passed")
+        logger.debug("Configuration validation passed")
 
-        logger.info("Testing ClickHouse connectivity...")
+        logger.debug("Testing ClickHouse connectivity...")
         with ClickHouseClient(config.clickhouse) as client:
             if client.test_connection():
-                logger.info("ClickHouse connection successful")
+                logger.debug("ClickHouse connection successful")
             else:
                 logger.error("ClickHouse connection failed")
                 return 1
 
-        logger.info("All validation checks passed")
+        logger.debug("Validation complete")
         return 0
 
     except HarnessError as e:
@@ -75,7 +75,7 @@ def cmd_init_db(args: argparse.Namespace) -> int:
         Exit code (0 for success, 1 for failure)
     """
     try:
-        logger.info(f"Loading configuration from {args.config}")
+        logger.debug(f"Loading configuration from {args.config}")
         config = load_config(args.config)
 
         # Resolve variant
@@ -84,11 +84,11 @@ def cmd_init_db(args: argparse.Namespace) -> int:
         project_root = compute_project_root(config)
         variant_root = compute_variant_root(config)
 
-        logger.info("Applying database schema...")
+        logger.debug("Applying database schema...")
         with ClickHouseClient(config.clickhouse) as client:
             apply_schema(config, client, project_root, variant_root)
 
-        logger.info("Schema application completed successfully")
+        logger.debug("Schema applied")
         return 0
 
     except HarnessError as e:
@@ -109,7 +109,7 @@ def cmd_load_data(args: argparse.Namespace) -> int:
         Exit code (0 for success, 1 for failure)
     """
     try:
-        logger.info(f"Loading configuration from {args.config}")
+        logger.debug(f"Loading configuration from {args.config}")
         config = load_config(args.config)
 
         # Resolve variant
@@ -118,11 +118,11 @@ def cmd_load_data(args: argparse.Namespace) -> int:
         project_root = compute_project_root(config)
         variant_root = compute_variant_root(config)
 
-        logger.info("Loading data into tables...")
+        logger.debug("Loading data into tables...")
         with ClickHouseClient(config.clickhouse) as client:
             load_data(config, client, project_root, variant_root)
 
-        logger.info("Data loading completed successfully")
+        logger.debug("Data loaded")
         return 0
 
     except HarnessError as e:
@@ -143,7 +143,7 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
         Exit code (0 for success, 1 for failure)
     """
     try:
-        logger.info(f"Loading configuration from {args.config}")
+        logger.debug(f"Loading configuration from {args.config}")
         config = load_config(args.config)
 
         # Resolve variant
@@ -152,7 +152,7 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
         project_root = compute_project_root(config)
         variant_root = compute_variant_root(config)
 
-        logger.info("Running workload...")
+        logger.debug("Running workload...")
         workload_result = run_workload(config, project_root, variant_root)
 
         execution_records = workload_result["records"]
@@ -162,14 +162,14 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
             "workload_elapsed_secs": workload_result["workload_elapsed_secs"],
         }
 
-        logger.info(f"Workload completed: {len(execution_records)} queries executed")
+        logger.debug(f"Workload completed: {len(execution_records)} queries executed")
 
         # Convert epoch milliseconds to datetime for metrics collection
         start_time = datetime.fromtimestamp(workload_result["workload_start_epoch_ms"] / 1000)
         end_time = datetime.fromtimestamp(workload_result["workload_end_epoch_ms"] / 1000)
 
         # Collect metrics from query_log
-        logger.info("Collecting metrics from query_log...")
+        logger.debug("Collecting metrics from query_log...")
         with ClickHouseClient(config.clickhouse) as client:
             query_log_metrics = collect_query_log_metrics(
                 config,
@@ -180,7 +180,7 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
             )
 
         # Generate reports
-        logger.info("Generating reports...")
+        logger.debug("Generating reports...")
         generate_reports(
             config,
             execution_records,
@@ -189,7 +189,7 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
             project_root,
         )
 
-        logger.info("Workload execution and reporting completed successfully")
+        logger.debug("Workload execution and reporting complete")
         return 0
 
     except HarnessError as e:
@@ -210,11 +210,17 @@ def cmd_full_run(args: argparse.Namespace) -> int:
         Exit code (0 for success, 1 for failure)
     """
     try:
-        logger.info(f"Loading configuration from {args.config}")
+        logger.debug(f"Loading configuration from {args.config}")
         config = load_config(args.config)
 
         # Resolve variant
         config = resolve_variant_config(config, args.variant)
+
+        # High-level banner
+        logger.info("=" * 60)
+        logger.info(f"Starting benchmark: {config.project} / {config.variant}")
+        logger.info(f"Workload: {config.workload.name} ({config.workload.concurrency} workers, {config.workload.duration_seconds}s)")
+        logger.info("=" * 60)
 
         # If dry-run, only validate
         if args.dry_run:
@@ -222,33 +228,36 @@ def cmd_full_run(args: argparse.Namespace) -> int:
             return cmd_validate(args)
 
         # Step 1: Validate
-        logger.info("Step 1: Validating configuration...")
+        logger.info("[1/4] Validating configuration...")
         if cmd_validate(args) != 0:
-            logger.error("Validation failed, aborting full-run")
+            logger.error("Validation failed, aborting")
             return 1
 
         # Step 2: Initialize database if fresh schema requested
         if config.schema.fresh:
-            logger.info("Step 2: Initializing database (fresh schema)...")
+            logger.info("[2/4] Initializing database (fresh schema)...")
             if cmd_init_db(args) != 0:
-                logger.error("Schema initialization failed, aborting full-run")
+                logger.error("Schema initialization failed, aborting")
                 return 1
         else:
-            logger.info("Step 2: Skipping schema initialization (fresh=False)")
+            logger.info("[2/4] Skipping schema initialization (fresh=False)")
 
         # Step 3: Load data
-        logger.info("Step 3: Loading data...")
+        logger.info("[3/4] Loading data...")
         if cmd_load_data(args) != 0:
-            logger.error("Data loading failed, aborting full-run")
+            logger.error("Data loading failed, aborting")
             return 1
 
         # Step 4: Run workload
-        logger.info("Step 4: Running workload...")
+        logger.info("[4/4] Running workload...")
         if cmd_run_workload(args) != 0:
-            logger.error("Workload execution failed, aborting full-run")
+            logger.error("Workload execution failed, aborting")
             return 1
 
-        logger.info("Full benchmark run completed successfully")
+        logger.info("=" * 60)
+        logger.info(f"Benchmark completed: {config.variant}")
+        logger.info(f"Results: projects/{config.project}/results/results_{config.variant}.csv")
+        logger.info("=" * 60)
         return 0
 
     except HarnessError as e:

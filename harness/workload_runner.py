@@ -80,7 +80,7 @@ def load_queries(
 
     if config.queries:
         # Explicit mode
-        logger.info(f"Loading {len(config.queries)} explicit queries")
+        logger.debug(f"Loading {len(config.queries)} explicit queries")
 
         for query_spec in config.queries:
             # Try variant first, then project
@@ -108,7 +108,7 @@ def load_queries(
 
     else:
         # Auto-discovery mode
-        logger.info("Auto-discovering queries from workload directory")
+        logger.debug("Auto-discovering queries from workload directory")
 
         variant_dir = variant_root / "workloads" / config.path
         project_dir = project_root / "workloads" / config.path
@@ -143,7 +143,7 @@ def load_queries(
             )
 
         queries = list(query_files.values())
-        logger.info(f"Auto-discovered {len(queries)} queries")
+        logger.debug(f"Auto-discovered {len(queries)} queries")
 
     return queries
 
@@ -183,10 +183,10 @@ def run_warmup(
         param_config: Parameter configuration for query substitution
     """
     if warmup_queries == 0:
-        logger.info("Skipping warmup (warmup_queries=0)")
+        logger.debug("Skipping warmup (warmup_queries=0)")
         return
 
-    logger.info(f"Running {warmup_queries} warmup queries (single-threaded)")
+    logger.debug(f"Running {warmup_queries} warmup queries (single-threaded)")
 
     for i in range(warmup_queries):
         # Select random query
@@ -212,7 +212,7 @@ def run_warmup(
         if (i + 1) % 100 == 0:
             logger.debug(f"Warmup progress: {i+1}/{warmup_queries}")
 
-    logger.info("Warmup complete")
+    logger.debug("Warmup complete")
 
 
 def worker_func(
@@ -373,7 +373,7 @@ def run_workload(
     # Build weighted pool
     query_pool = build_weighted_pool(queries)
 
-    logger.info(
+    logger.debug(
         f"Workload: {config.workload.name}, "
         f"concurrency: {config.workload.concurrency}, "
         f"duration: {config.workload.duration_seconds}s"
@@ -406,7 +406,7 @@ def run_workload(
     )
 
     # Run concurrent workload
-    logger.info("Starting concurrent workload execution")
+    logger.info(f"Running workload: {config.workload.concurrency} workers × {config.workload.duration_seconds}s")
 
     workload_start_epoch_ms = int(time.time() * 1000)
     start_time = time.time()
@@ -436,7 +436,7 @@ def run_workload(
 
         # Wait for ramp-up period before starting measurement
         if config.workload.ramp_up_seconds > 0:
-            logger.info(f"Ramp-up period: {config.workload.ramp_up_seconds}s")
+            logger.debug(f"Ramp-up period: {config.workload.ramp_up_seconds}s")
             time.sleep(config.workload.ramp_up_seconds)
             # Reset start time after ramp-up
             workload_start_epoch_ms = int(time.time() * 1000)
@@ -453,9 +453,8 @@ def run_workload(
     client.client.close()
 
     logger.info(
-        f"Workload complete: {len(all_records)} queries executed, "
-        f"{error_counter.value} errors, "
-        f"elapsed: {workload_elapsed_secs:.2f}s"
+        f"Completed: {len(all_records)} queries in {workload_elapsed_secs:.2f}s "
+        f"({error_counter.value} errors)"
     )
 
     # Check if error threshold exceeded

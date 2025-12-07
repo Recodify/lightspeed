@@ -41,13 +41,13 @@ def collect_query_log_metrics(
         MetricsCollectionError: If metrics collection fails
     """
     if not config.metrics.use_query_log:
-        logger.info("Query log collection disabled in config")
+        logger.debug("Query log collection disabled in config")
         return {}
 
     # Wait for query_log to flush
     wait_seconds = config.metrics.query_log_wait_seconds
     if wait_seconds > 0:
-        logger.info(f"Waiting {wait_seconds}s for query_log to flush...")
+        logger.debug(f"Waiting {wait_seconds}s for query_log to flush...")
         time.sleep(wait_seconds)
 
     # Extract all query_ids from execution records
@@ -57,7 +57,7 @@ def collect_query_log_metrics(
         logger.warning("No execution records to collect metrics for")
         return {}
 
-    logger.info(f"Collecting metrics for {len(query_ids)} queries from system.query_log")
+    logger.debug(f"Collecting metrics for {len(query_ids)} queries from system.query_log")
 
     # Build SQL query to fetch metrics
     # Convert datetime to string format ClickHouse expects
@@ -125,6 +125,6 @@ def collect_query_log_metrics(
             f"({extra_count} extra entries). This may indicate duplicate query_ids."
         )
     else:
-        logger.info(f"Successfully collected metrics for all {actual_count} queries")
+        logger.debug(f"Successfully collected metrics for all {actual_count} queries")
 
     return metrics_map

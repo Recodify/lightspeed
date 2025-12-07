@@ -40,7 +40,7 @@ def apply_schema(
 
     # Fresh database if requested
     if config.schema.fresh:
-        logger.info("Fresh schema mode: dropping and recreating database")
+        logger.debug("Fresh schema mode: dropping and recreating database")
         database = config.clickhouse.database
 
         # For DDL operations, we need to use a database-agnostic connection
@@ -60,7 +60,7 @@ def apply_schema(
                 headers={"Content-Type": "text/plain"}
             )
             response.raise_for_status()
-            logger.info(f"Dropped database: {database}")
+            logger.debug(f"Dropped database: {database}")
         except Exception as e:
             msg = f"Failed to drop database {database}: {e}"
             if config.schema.fail_on_error:
@@ -77,7 +77,7 @@ def apply_schema(
                 headers={"Content-Type": "text/plain"}
             )
             response.raise_for_status()
-            logger.info(f"Created database: {database}")
+            logger.debug(f"Created database: {database}")
         except Exception as e:
             msg = f"Failed to create database {database}: {e}"
             if config.schema.fail_on_error:
@@ -89,7 +89,7 @@ def apply_schema(
     project_schemas_dir = project_root / "schemas"
     if project_schemas_dir.exists():
         schema_files = sorted(project_schemas_dir.glob("*.sql"))
-        logger.info(f"Found {len(schema_files)} project-wide schema files")
+        logger.debug(f"Found {len(schema_files)} project-wide schema files")
 
         for schema_file in schema_files:
             success = _execute_schema_file(
@@ -105,7 +105,7 @@ def apply_schema(
     variant_schemas_dir = variant_root / "schemas"
     if variant_schemas_dir.exists():
         schema_files = sorted(variant_schemas_dir.glob("*.sql"))
-        logger.info(f"Found {len(schema_files)} variant-specific schema files")
+        logger.debug(f"Found {len(schema_files)} variant-specific schema files")
 
         for schema_file in schema_files:
             success = _execute_schema_file(
@@ -118,7 +118,7 @@ def apply_schema(
         logger.debug(f"No variant schemas directory: {variant_schemas_dir}")
 
     # Log summary
-    logger.info(f"Schema loading complete: {executed} executed, {failed} failed")
+    logger.debug(f"Schema loading complete: {executed} executed, {failed} failed")
 
     return {"executed": executed, "failed": failed}
 
@@ -144,7 +144,7 @@ def _execute_schema_file(
         SchemaLoadError: If execution fails and fail_on_error=True
     """
     try:
-        logger.info(f"Executing {scope} schema: {schema_file.name}")
+        logger.debug(f"Executing {scope} schema: {schema_file.name}")
         sql = schema_file.read_text()
 
         # Execute entire file as single statement

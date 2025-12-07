@@ -160,9 +160,9 @@ def resolve_variant_config(base_config: BenchmarkConfig, variant_name: str) -> B
         )
 
     variant = base_config.variants[variant_name]
-    logger.info(f"Resolving variant: {variant_name}")
+    logger.debug(f"Resolving variant: {variant_name}")
     if variant.description:
-        logger.info(f"  Description: {variant.description}")
+        logger.debug(f"  Description: {variant.description}")
 
     # Apply variant overrides (base + variant = desired state)
     resolved_clickhouse = variant.clickhouse if variant.clickhouse is not None else base_config.clickhouse
@@ -267,8 +267,8 @@ def validate_project_structure(config: BenchmarkConfig, base_dir: Path | None = 
     if not variant_root.exists():
         raise ValidationError(f"Variant directory not found: {variant_root}")
 
-    logger.info(f"Project root: {project_root}")
-    logger.info(f"Variant root: {variant_root}")
+    logger.debug(f"Project root: {project_root}")
+    logger.debug(f"Variant root: {variant_root}")
 
 
 def validate_schema_files(
@@ -289,11 +289,11 @@ def validate_schema_files(
     project_schemas = sorted((project_root / "schemas").glob("*.sql")) if (project_root / "schemas").exists() else []
     variant_schemas = sorted((variant_root / "schemas").glob("*.sql")) if (variant_root / "schemas").exists() else []
 
-    logger.info(f"Found {len(project_schemas)} project-wide schema files")
-    logger.info(f"Found {len(variant_schemas)} variant-specific schema files")
+    logger.debug(f"Found {len(project_schemas)} project-wide schema files")
+    logger.debug(f"Found {len(variant_schemas)} variant-specific schema files")
 
     if not project_schemas and not variant_schemas:
-        logger.warning("No schema files found (this may be intentional)")
+        logger.debug("No schema files found (this may be intentional)")
 
 
 def validate_data_files(
@@ -321,9 +321,9 @@ def validate_data_files(
         found_variant = variant_path.exists()
 
         if found_project:
-            logger.info(f"Data file found (project): {project_path}")
+            logger.debug(f"Data file found (project): {project_path}")
         if found_variant:
-            logger.info(f"Data file found (variant): {variant_path}")
+            logger.debug(f"Data file found (variant): {variant_path}")
 
         if not found_project and not found_variant:
             raise ValidationError(
@@ -355,9 +355,9 @@ def validate_workload_files(
             project_query = project_root / "workloads" / workload_path / query.file
 
             if variant_query.exists():
-                logger.info(f"Query file found (variant): {variant_query}")
+                logger.debug(f"Query file found (variant): {variant_query}")
             elif project_query.exists():
-                logger.info(f"Query file found (project): {project_query}")
+                logger.debug(f"Query file found (project): {project_query}")
             else:
                 raise ValidationError(
                     f"Query file not found: {query.file} "
@@ -379,7 +379,7 @@ def validate_workload_files(
                 f"(checked {variant_workload_dir} and {project_workload_dir})"
             )
 
-        logger.info(f"Auto-discovery mode: found {total_queries} unique query files")
+        logger.debug(f"Auto-discovery mode: found {total_queries} unique query files")
 
 
 def validate_config(
@@ -410,6 +410,6 @@ def validate_config(
     validate_data_files(config, project_root, variant_root)
     validate_workload_files(config, project_root, variant_root)
 
-    logger.info("Configuration validation successful")
+    logger.debug("Configuration validation successful")
 
     return project_root, variant_root

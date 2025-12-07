@@ -96,7 +96,7 @@ def load_data(
         for data_file, source in data_files:
             file_size = data_file.stat().st_size
 
-            logger.info(
+            logger.debug(
                 f"Loading {entry.file} ({source}) ({format_bytes(file_size)}) "
                 f"into table {entry.table} as {entry.format}"
             )
@@ -118,7 +118,7 @@ def load_data(
                 duration = time.time() - start_time
                 throughput_mbps = (file_size / (1024 * 1024)) / duration if duration > 0 else 0
 
-                logger.info(
+                logger.debug(
                     f"Loaded {entry.table} ({source}): {format_bytes(file_size)} "
                     f"in {duration:.2f}s ({throughput_mbps:.2f} MB/s)"
                 )
@@ -131,7 +131,7 @@ def load_data(
                     f"Failed to load {entry.file} ({source}) into {entry.table}: {e}"
                 )
 
-    logger.info(
+    logger.debug(
         f"Data loading complete: {files_loaded} files loaded, "
         f"{format_bytes(bytes_transferred)} total"
     )

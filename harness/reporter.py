@@ -32,7 +32,7 @@ def generate_reports(
             - workload_elapsed_secs: Actual workload duration in seconds
         project_root: Project root directory for output files
     """
-    logger.info("Generating benchmark reports...")
+    logger.debug("Generating benchmark reports...")
 
     # Group execution records by query_name
     queries_data = defaultdict(list)
@@ -110,9 +110,7 @@ def generate_reports(
         config
     )
 
-    logger.info(f"Reports generated:")
-    logger.info(f"  CSV: {csv_path}")
-    logger.info(f"  Markdown: {md_path}")
+    logger.info(f"Results saved: {csv_path.relative_to(project_root.parent.parent)}")
 
 
 def _generate_csv_report(
