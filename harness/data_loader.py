@@ -7,6 +7,7 @@ from pathlib import Path
 from harness.clickhouse_client import ClickHouseClient
 from harness.config import BenchmarkConfig
 from harness.exceptions import DataLoadError
+from harness.utils import format_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +97,7 @@ def load_data(
             file_size = data_file.stat().st_size
 
             logger.info(
-                f"Loading {entry.file} ({source}) ({_format_bytes(file_size)}) "
+                f"Loading {entry.file} ({source}) ({format_bytes(file_size)}) "
                 f"into table {entry.table} as {entry.format}"
             )
 
@@ -118,7 +119,7 @@ def load_data(
                 throughput_mbps = (file_size / (1024 * 1024)) / duration if duration > 0 else 0
 
                 logger.info(
-                    f"Loaded {entry.table} ({source}): {_format_bytes(file_size)} "
+                    f"Loaded {entry.table} ({source}): {format_bytes(file_size)} "
                     f"in {duration:.2f}s ({throughput_mbps:.2f} MB/s)"
                 )
 
@@ -132,29 +133,10 @@ def load_data(
 
     logger.info(
         f"Data loading complete: {files_loaded} files loaded, "
-        f"{_format_bytes(bytes_transferred)} total"
+        f"{format_bytes(bytes_transferred)} total"
     )
 
     return {
         "files_loaded": files_loaded,
         "bytes_transferred": bytes_transferred
     }
-
-
-def _format_bytes(bytes_count: int) -> str:
-    """Format bytes as human-readable string.
-
-    Args:
-        bytes_count: Number of bytes
-
-    Returns:
-        Formatted string (e.g., "1.2 MB", "45 KB")
-    """
-    if bytes_count < 1024:
-        return f"{bytes_count} B"
-    elif bytes_count < 1024 * 1024:
-        return f"{bytes_count / 1024:.2f} KB"
-    elif bytes_count < 1024 * 1024 * 1024:
-        return f"{bytes_count / (1024 * 1024):.2f} MB"
-    else:
-        return f"{bytes_count / (1024 * 1024 * 1024):.2f} GB"

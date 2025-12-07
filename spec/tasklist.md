@@ -349,20 +349,22 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
 
 ---
 
-### 12. Utils Module
+### 12. Utils Module ✅
 
 **File:** `harness/utils.py`
 
-- [ ] Implement `setup_logging(verbose: bool)`
+- [x] Implement `setup_logging(verbose: bool)`
   - Configure logging level (DEBUG if verbose, INFO otherwise)
   - Set format with timestamps
   - Configure handler to stdout
 
-- [ ] Implement `format_duration(ms: float) -> str`
+- [x] Implement `format_duration(ms: float) -> str`
   - Convert milliseconds to human-readable (e.g., "1.2s", "45ms")
 
-- [ ] Implement `format_bytes(bytes: int) -> str`
+- [x] Implement `format_bytes(bytes: int) -> str`
   - Convert to KB/MB/GB as appropriate
+
+**Note:** Refactored cli.py and data_loader.py to use centralized utils functions, eliminating code duplication.
 
 ---
 
@@ -421,17 +423,19 @@ Phase 1 delivers a complete end-to-end benchmarking harness with core functional
 
 ---
 
-### 14. Example Project Setup
+### 14. Example Project Setup ✅
 
 **Directory:** `projects/default/`
 
-- [ ] Create `configs/example_basic.yml` with minimal valid config
-- [ ] Create `configs/example_weighted.yml` showing query weights
-- [ ] Create `configs/example_params.yml` showing parameterization
-- [ ] Create `variants/default/schemas/001_create_tables.sql` with example schema
-- [ ] Create `variants/default/data/sample.csv` with small test dataset
-- [ ] Create `workloads/baseline/q01_simple.sql` with example query
-- [ ] Create empty `results/.gitkeep`
+- [x] Create `configs/example_basic.yml` with minimal valid config
+- [x] Create `configs/example_weighted.yml` showing query weights
+- [x] Create `configs/example_params.yml` showing parameterization
+- [x] Create `variants/default/schemas/001_create_tables.sql` with example schema
+- [x] Create `variants/default/data/sample.csv` with small test dataset (20 rows)
+- [x] Create `workloads/baseline/q01_simple.sql` with example query
+- [x] Create `workloads/baseline/q02_aggregate.sql` with aggregate query
+- [x] Create `workloads/baseline/q03_parameterized.sql` with parameterized query
+- [x] Create empty `results/.gitkeep`
 
 ---
 

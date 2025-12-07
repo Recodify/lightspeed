@@ -1,0 +1,46 @@
+project: default
+variant: default
+
+clickhouse:
+  host: localhost
+  port: 8123
+  user: default
+  password: ""
+  database: benchmark
+  connection_pool_size: 10
+  timeout_seconds: 300
+
+schema:
+  fail_on_error: true
+  fresh: true
+
+data:
+  load_method: insert
+  truncate_before_load: false
+  load:
+    - table: events
+      file: sample.csv
+      format: CSVWithNames
+
+workload:
+  name: weighted_benchmark
+  path: baseline
+  # Explicit query list with weights
+  queries:
+    - file: q01_simple.sql
+      weight: 5  # Run 5x more often
+    - file: q02_aggregate.sql
+      weight: 1
+  concurrency: 8
+  duration_seconds: 30
+  ramp_up_seconds: 2
+  warmup_queries: 20
+  think_time_ms: 10
+  max_errors: 100
+  query_timeout_seconds: 60
+
+metrics:
+  use_query_log: true
+  query_log_wait_seconds: 10
+  output_csv: results/weighted_results.csv
+  output_md: results/weighted_results.md

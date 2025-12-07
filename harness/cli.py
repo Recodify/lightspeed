@@ -18,23 +18,10 @@ from harness.exceptions import HarnessError
 from harness.metrics_collector import collect_query_log_metrics
 from harness.reporter import generate_reports
 from harness.schema_loader import apply_schema
+from harness.utils import setup_logging
 from harness.workload_runner import run_workload
 
 logger = logging.getLogger(__name__)
-
-
-def setup_logging(verbose: bool) -> None:
-    """Configure logging for the harness.
-
-    Args:
-        verbose: If True, set log level to DEBUG; otherwise INFO
-    """
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
 
 
 def cmd_validate(args: argparse.Namespace) -> int:

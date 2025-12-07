@@ -1,0 +1,54 @@
+project: default
+variant: default
+
+clickhouse:
+  host: localhost
+  port: 8123
+  user: default
+  password: ""
+  database: benchmark
+  connection_pool_size: 10
+  timeout_seconds: 300
+
+schema:
+  fail_on_error: true
+  fresh: true
+
+data:
+  load_method: insert
+  truncate_before_load: false
+  load:
+    - table: events
+      file: sample.csv
+      format: CSVWithNames
+
+workload:
+  name: parameterized_benchmark
+  path: baseline
+  concurrency: 4
+  duration_seconds: 20
+  ramp_up_seconds: 1
+  warmup_queries: 15
+  think_time_ms: 5
+  max_errors: 100
+  query_timeout_seconds: 60
+  # Parameter definitions
+  parameters:
+    user_id:
+      type: random_int
+      min: 1
+      max: 1000
+    event_type:
+      type: random_choice
+      values:
+        - login
+        - logout
+        - click
+        - purchase
+        - view
+
+metrics:
+  use_query_log: true
+  query_log_wait_seconds: 5
+  output_csv: results/parameterized_results.csv
+  output_md: results/parameterized_results.md
