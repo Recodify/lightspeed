@@ -4,6 +4,7 @@ import csv
 import os
 import random
 import sys
+import uuid
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
@@ -16,13 +17,13 @@ FIELDNAMES = [
     "uuid_id",
     "as_of",
     "timestamp",
-    "start",
-    "end",
-    "ingest",
+    "period_start",
+    "period_end",
+    "published_date",
     "quantity",
 ]
 
-DATE_FIELDS = {"as_of", "timestamp", "start", "end", "ingest"}
+DATE_FIELDS = {"as_of", "timestamp", "period_start", "period_end", "published_date"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -219,14 +220,15 @@ def _generate_name(target_len: int, seed_value: Optional[int]) -> str:
         random.seed(seed_value)
     try:
         words: List[str] = []
-        while len("-".join(words)) < target_len:
+        
+        while len(".".join(words)) < target_len:
             words.extend(generate_slug(2).split("-"))
-        name = "-".join(words)
+        name = ".".join(words)
         if len(name) > target_len:
             name = name[:target_len]
-            if name.endswith("-"):
-                name = name.rstrip("-")
-        return name
+            if name.endswith("."):
+                name = name.rstrip(".")
+        return f"EDFT.{name.upper()}.EDFT"
     finally:
         if state is not None:
             random.setstate(state)
@@ -273,11 +275,11 @@ def _build_record(
         "id": meta["id"],
         "name": meta["name"],
         "uuid_id": meta["uuid_id"],
-        "asofDateTime": period_end,
+        "as_of_datetime": period_end,
         "timestamp": period_end,
-        "periodStart": period_start,
-        "periodEnd": period_end,
-        "publishedData": published,
+        "period_start": period_start,
+        "period_end": period_end,
+        "published_date": published,
         "quantity": quantity,
     }
 
