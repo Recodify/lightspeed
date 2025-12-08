@@ -55,6 +55,36 @@ def collect_data_files(
     return files_to_load
 
 
+def resolve_script_path(script: str, project_root: Path, variant_root: Path) -> Path:
+    """Resolve a load script path, preferring variant over project scope.
+
+    Args:
+        script: Script filename relative to data directories
+        project_root: Project root directory
+        variant_root: Variant root directory
+
+    Returns:
+        Path to the script file
+
+    Raises:
+        DataLoadError: If script file cannot be found
+    """
+    candidate_variant = variant_root / "data" / script
+    candidate_project = project_root / "data" / script
+
+    if candidate_variant.exists():
+        logger.debug(f"Using variant data load script: {candidate_variant}")
+        return candidate_variant
+
+    if candidate_project.exists():
+        logger.debug(f"Using project data load script: {candidate_project}")
+        return candidate_project
+
+    raise DataLoadError(
+        f"Data load script not found: {script} (checked {candidate_variant} and {candidate_project})"
+    )
+
+
 def load_data(
     config: BenchmarkConfig,
     client: ClickHouseClient,
@@ -87,6 +117,7 @@ def load_data(
     bytes_transferred = 0
     file_stats: list[dict] = []
     overall_start = time.time()
+    load_method = config.data.load_method.lower()
 
     # Compute isolated database name
     isolated_database = compute_isolated_database_name(
@@ -97,8 +128,17 @@ def load_data(
         # Use database.table format
         full_table_name = f"{isolated_database}.{entry.table}"
 
+        if load_method == "script" and not entry.script:
+            raise DataLoadError(
+                f"Data load entry for table {entry.table} requires a script when load_method is 'script'"
+            )
+
         # Collect all data files for this entry (project + variant)
         data_files = collect_data_files(entry.file, project_root, variant_root)
+
+        script_path = None
+        if load_method == "script":
+            script_path = resolve_script_path(entry.script, project_root, variant_root)
 
         # Truncate once before loading all files for this table
         if config.data.truncate_before_load:
@@ -128,8 +168,34 @@ def load_data(
             start_time = time.time()
 
             try:
-                with open(data_file, "rb") as f:
-                    client.insert_stream(full_table_name, f, actual_format)
+                if load_method == "http":
+                    with open(data_file, "rb") as f:
+                        client.insert_stream(full_table_name, f, actual_format)
+                elif load_method == "insert":
+                    escaped_path = str(data_file.resolve()).replace("'", "\\'")
+                    query = (
+                        f"INSERT INTO {full_table_name} "
+                        f"SELECT * FROM file('{escaped_path}', '{actual_format}')"
+                    )
+                    client.execute_no_result(query)
+                elif load_method == "script":
+                    escaped_path = str(data_file.resolve()).replace("'", "\\'")
+                    script_template = script_path.read_text()
+                    try:
+                        query = script_template.format(
+                            table=full_table_name,
+                            file_path=escaped_path,
+                            format=actual_format,
+                        )
+                    except Exception as e:
+                        raise DataLoadError(
+                            f"Failed to format load script {script_path}: {e}"
+                        )
+                    client.execute_no_result(query)
+                else:
+                    raise DataLoadError(
+                        f"Unsupported load method: {config.data.load_method}"
+                    )
 
                 duration = time.time() - start_time
                 throughput_mbps = (file_size / (1024 * 1024)) / duration if duration > 0 else 0
