@@ -85,6 +85,24 @@ def resolve_script_path(script: str, project_root: Path, variant_root: Path) -> 
     )
 
 
+def get_clickhouse_file_path(data_file: Path, repo_root: Path) -> str:
+    """
+    Convert a data file path to a ClickHouse-accessible path.
+
+    We prefer a path relative to the repo root so it can be resolved inside
+    ClickHouse when the repo is mounted into /var/lib/clickhouse/user_files
+    (container scenario). If the file is unexpectedly outside the repo, fall
+    back to the absolute path to preserve existing behavior.
+    """
+    try:
+        return str(data_file.resolve().relative_to(repo_root.resolve()))
+    except ValueError:
+        logger.debug(
+            "Data file is outside repo root; falling back to absolute path: %s", data_file
+        )
+        return str(data_file.resolve())
+
+
 def load_data(
     config: BenchmarkConfig,
     client: ClickHouseClient,
@@ -118,6 +136,7 @@ def load_data(
     file_stats: list[dict] = []
     overall_start = time.time()
     load_method = config.data.load_method.lower()
+    repo_root = project_root.parents[1] if len(project_root.parents) > 1 else project_root.parent
 
     # Compute isolated database name
     isolated_database = compute_isolated_database_name(
@@ -164,22 +183,30 @@ def load_data(
                 actual_format = "CSVWithNames"
                 logger.debug(f"Using {actual_format} for CSV with headers")
 
+            # Allow ISO8601 datetimes with T/Z when loading CSV data
+            load_settings = None
+            if actual_format.upper().startswith("CSV"):
+                load_settings = {"date_time_input_format": "best_effort"}
+
             # Load data
             start_time = time.time()
 
             try:
                 if load_method == "http":
                     with open(data_file, "rb") as f:
-                        client.insert_stream(full_table_name, f, actual_format)
+                        client.insert_stream(full_table_name, f, actual_format, settings=load_settings)
                 elif load_method == "insert":
-                    escaped_path = str(data_file.resolve()).replace("'", "\\'")
+                    file_path = get_clickhouse_file_path(data_file, repo_root)
+                    escaped_path = file_path.replace("'", "\\'")
                     query = (
                         f"INSERT INTO {full_table_name} "
                         f"SELECT * FROM file('{escaped_path}', '{actual_format}')"
                     )
-                    client.execute_no_result(query)
+                    logger.info(query)
+                    client.execute_no_result(query, settings=load_settings)
                 elif load_method == "script":
-                    escaped_path = str(data_file.resolve()).replace("'", "\\'")
+                    file_path = get_clickhouse_file_path(data_file, repo_root)
+                    escaped_path = file_path.replace("'", "\\'")
                     script_template = script_path.read_text()
                     try:
                         query = script_template.format(
@@ -187,11 +214,12 @@ def load_data(
                             file_path=escaped_path,
                             format=actual_format,
                         )
+                        logger.info(query)
                     except Exception as e:
                         raise DataLoadError(
                             f"Failed to format load script {script_path}: {e}"
                         )
-                    client.execute_no_result(query)
+                    client.execute_no_result(query, settings=load_settings)
                 else:
                     raise DataLoadError(
                         f"Unsupported load method: {config.data.load_method}"

@@ -1,4 +1,4 @@
-project: default
+project: full
 
 # Project-level defaults (shared across all variants)
 clickhouse:
@@ -43,7 +43,7 @@ variants:
   default:
     description: "Baseline configuration with sample data"
     data:
-      load_method: insert
+      load_method: http
       truncate_before_load: false
       load:
         - table: events
@@ -53,7 +53,7 @@ variants:
   variant1:
     description: "Variant 1 configuration (same as default for now)"
     data:
-      load_method: insert
+      load_method: http
       truncate_before_load: false
       load:
         - table: events

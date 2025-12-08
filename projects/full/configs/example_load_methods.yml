@@ -1,0 +1,49 @@
+project: full
+
+clickhouse:
+  host: localhost
+  port: 8123
+  user: default
+  password: "default"
+  connection_pool_size: 10
+  timeout_seconds: 300
+
+schema:
+  fail_on_error: true
+  fresh: true
+
+workload:
+  name: load_methods_demo
+  path: baseline
+  queries:
+    - file: q01_simple.sql
+      weight: 2
+    - file: q02_aggregate.sql
+      weight: 1
+  concurrency: 4
+  duration_seconds: 15
+  ramp_up_seconds: 1
+  warmup_queries: 10
+  think_time_ms: 5
+  max_errors: 100
+  query_timeout_seconds: 60
+
+metrics:
+  use_query_log: true
+  query_log_wait_seconds: 5
+  output_csv: results/load_methods_results.csv
+  output_md: results/load_methods_results.md
+
+variants:
+
+
+  variant1:
+    description: "Scripted load method for custom transforms/settings"
+    data:
+      load_method: script
+      truncate_before_load: true
+      load:
+        - table: events
+          file: sample.csv
+          format: CSVWithNames
+          script: load_events.sql

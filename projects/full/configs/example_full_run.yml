@@ -1,4 +1,4 @@
-project: default
+project: full
 
 clickhouse:
   host: localhost

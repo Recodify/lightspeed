@@ -1,4 +1,4 @@
-project: default
+project: full
 
 # Project-level defaults (shared across all variants)
 clickhouse:
