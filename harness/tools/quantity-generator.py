@@ -3,6 +3,7 @@ import argparse
 import csv
 import os
 import random
+import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
@@ -12,15 +13,16 @@ from coolname import generate_slug
 FIELDNAMES = [
     "id",
     "name",
-    "asofDateTime",
+    "uuid_id",
+    "as_of",
     "timestamp",
-    "periodStart",
-    "periodEnd",
-    "publishedData",
+    "start",
+    "end",
+    "ingest",
     "quantity",
 ]
 
-DATE_FIELDS = {"asofDateTime", "timestamp", "periodStart", "periodEnd", "publishedData"}
+DATE_FIELDS = {"as_of", "timestamp", "start", "end", "ingest"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -106,6 +108,17 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=100.0,
         help="Maximum quantity value.",
+    )
+    parser.add_argument(
+        "--progress",
+        action="store_true",
+        help="Print progress updates to stderr while generating/writing.",
+    )
+    parser.add_argument(
+        "--progress-interval",
+        type=int,
+        default=100000,
+        help="How many records between progress updates when --progress is set.",
     )
 
     return parser.parse_args()
@@ -226,8 +239,27 @@ def build_entity_meta(
     for eid in range(1, entity_count + 1):
         per_entity_seed = (base_seed or 0) + eid if base_seed is not None else None
         name = _generate_name(name_length, per_entity_seed)
-        meta.append({"id": eid, "name": name})
+        meta.append({"id": eid, "name": name, "uuid_id": str(uuid.uuid4())})
     return meta
+
+
+class ProgressTracker:
+    def __init__(self, total: int, interval: int, label: str):
+        self.total = max(1, total)
+        self.interval = max(1, interval)
+        self.label = label
+        self.count = 0
+
+    def tick(self, step: int = 1):
+        self.count += step
+        if self.count % self.interval == 0 or self.count >= self.total:
+            self.report()
+
+    def report(self):
+        print(
+            f"{self.label}: {self.count}/{self.total} ({(self.count / self.total) * 100:.1f}%)",
+            file=sys.stderr,
+        )
 
 
 def _build_record(
@@ -240,6 +272,7 @@ def _build_record(
     return {
         "id": meta["id"],
         "name": meta["name"],
+        "uuid_id": meta["uuid_id"],
         "asofDateTime": period_end,
         "timestamp": period_end,
         "periodStart": period_start,
@@ -285,6 +318,7 @@ def generate_records(
     date_range: Optional[Tuple[datetime, datetime]],
     quantity_min: float,
     quantity_max: float,
+    progress: Optional[ProgressTracker],
 ) -> List[dict]:
     records: List[dict] = []
     step = timedelta(seconds=time_between_seconds)
@@ -292,16 +326,17 @@ def generate_records(
     if date_range is not None:
         start_range, _ = date_range
         for m, count in zip(meta, records_per_entity):
-            records.extend(
-                _generate_entity_records(
-                    m,
-                    count,
-                    start_range,
-                    step,
-                    quantity_min,
-                    quantity_max,
-                )
+            generated = _generate_entity_records(
+                m,
+                count,
+                start_range,
+                step,
+                quantity_min,
+                quantity_max,
             )
+            records.extend(generated)
+            if progress:
+                progress.tick(len(generated))
         return records
 
     if base_start is None:
@@ -310,21 +345,26 @@ def generate_records(
     for m, count in zip(meta, records_per_entity):
         offset_seconds = random.randint(0, time_between_seconds * 10)
         first_start = base_start + timedelta(seconds=offset_seconds)
-        records.extend(
-            _generate_entity_records(
-                m,
-                count,
-                first_start,
-                step,
-                quantity_min,
-                quantity_max,
-            )
+        generated = _generate_entity_records(
+            m,
+            count,
+            first_start,
+            step,
+            quantity_min,
+            quantity_max,
         )
+        records.extend(generated)
+        if progress:
+            progress.tick(len(generated))
 
     return records
 
 
-def write_csv(output_path: str, records: List[dict]) -> None:
+def write_csv(
+    output_path: str,
+    records: List[dict],
+    progress: Optional[ProgressTracker],
+) -> None:
     with open(output_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
         writer.writeheader()
@@ -337,6 +377,8 @@ def write_csv(output_path: str, records: List[dict]) -> None:
                     for key in FIELDNAMES
                 }
             )
+            if progress:
+                progress.tick()
 
 
 def write_parquet(output_path: str, records: List[dict]) -> None:
@@ -392,6 +434,11 @@ def main():
         base_start = parse_iso_datetime(args.base_start_date)
 
     meta = build_entity_meta(entity_count, max(1, args.name_length), args.seed)
+    gen_progress = (
+        ProgressTracker(record_count, args.progress_interval, "Generated")
+        if args.progress
+        else None
+    )
     records = generate_records(
         meta,
         records_per_entity,
@@ -400,11 +447,22 @@ def main():
         date_range,
         args.quantity_min,
         args.quantity_max,
+        gen_progress,
     )
+
+    if gen_progress:
+        gen_progress.report()
 
     random.shuffle(records)
     if args.format == "csv":
-        write_csv(args.output, records)
+        write_progress = (
+            ProgressTracker(len(records), args.progress_interval, "Wrote")
+            if args.progress
+            else None
+        )
+        write_csv(args.output, records, write_progress)
+        if write_progress:
+            write_progress.report()
     else:
         write_parquet(args.output, records)
 
