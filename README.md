@@ -65,7 +65,6 @@ Create a minimal config file at `projects/myproject/configs/simple.yml`:
 
 ```yaml
 project: "myproject"
-variant: "baseline"
 
 clickhouse:
   host: "localhost"
@@ -74,23 +73,18 @@ clickhouse:
   password: ""
   database: "benchmark"
 
-schema:
-  fresh: true  # Drop and recreate database
-
-data:
-  load_method: "http"
-  load: []  # No data for this minimal example
-
 workload:
   name: "simple"
   path: "simple"
-  queries:
-    - file: "query.sql"
-  concurrency: 1
-  duration_seconds: 10
 
-metrics:
-  use_query_log: true
+variants:
+  default:
+    description: "Baseline configuration with sample data"
+    data:
+      load:
+        - table: events
+          file: sample.csv
+          format: CSVWithNames
 ```
 
 Create a schema at `projects/myproject/variants/baseline/schemas/001_create_table.sql`:
@@ -358,7 +352,6 @@ variants:
 
   optimized:
     description: "With secondary indexes"
-    # Variant-specific overrides can go here
 
   partitioned:
     description: "Partitioned by day"
