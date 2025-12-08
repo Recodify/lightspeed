@@ -47,9 +47,16 @@ This harness solves that problem by making it trivial to:
 ```bash
 git clone <repository-url>
 cd lightspeed
+# With make (recommended)
+make install
+
+# Or manually
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -e .
+
+# Helper: run commands inside the venv without activating your shell
+./activate.sh python -m harness.cli --help
 ```
 
 ### Minimal Example
