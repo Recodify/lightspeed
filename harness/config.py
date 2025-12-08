@@ -37,6 +37,7 @@ class DataLoadEntry(BaseModel):
     table: str
     file: str
     format: str
+    script: str | None = None
 
 
 class DataConfig(BaseModel):
@@ -45,6 +46,17 @@ class DataConfig(BaseModel):
     load_method: str = "http"
     truncate_before_load: bool = False
     load: list[DataLoadEntry] = Field(default_factory=list)
+
+    @field_validator("load_method")
+    @classmethod
+    def validate_load_method(cls, v: str) -> str:
+        supported_methods = {"http", "insert", "script"}
+        method = v.lower()
+        if method not in supported_methods:
+            raise ValueError(
+                f"Invalid load_method: {v}. Supported methods: {', '.join(sorted(supported_methods))}"
+            )
+        return method
 
 
 class QuerySpec(BaseModel):

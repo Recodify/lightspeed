@@ -281,14 +281,20 @@ Data loading configuration.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `load_method` | string | Yes | - | Loading method (currently only `"http"` supported) |
+| `load_method` | string | Yes | - | Loading method (`"http"` streaming, `"insert"` using `INSERT ... SELECT FROM file(...)`, or `"script"` to run a templated SQL file) |
 | `truncate_before_load` | boolean | No | false | TRUNCATE tables before loading data |
 | `load` | array | Yes | - | List of table/file mappings |
 | `load[].table` | string | Yes | - | Target table name |
 | `load[].file` | string | Yes | - | Data file name (relative to `data/` or `variants/<variant>/data/`) |
 | `load[].format` | string | Yes | - | ClickHouse format (e.g., `CSVWithNames`, `Parquet`, `JSONEachRow`) |
+| `load[].script` | string | No | - | Path to SQL script relative to data directories (required when `load_method` is `"script"`) |
 
 **Data file resolution**: Files are searched in variant-level `data/` first, then project-level `data/`.
+
+**Data loading methods**:
+- `http` (default): Stream file contents over HTTP using `FORMAT <type>`.
+- `insert`: Execute `INSERT INTO <table> SELECT * FROM file('<path>', '<format>')` so ClickHouse reads the local file directly.
+- `script`: Execute a SQL script (variant overrides project) with placeholders `{table}`, `{file_path}`, and `{format}` filled per data file. Scripts are resolved from `variants/<variant>/data/` first, then `data/`.
 
 **Data loading metrics**: Load performance (throughput, duration) is captured in `data_load.json` and `data_load.csv`.
 
