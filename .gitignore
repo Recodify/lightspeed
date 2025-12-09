@@ -5,5 +5,9 @@ __pycache__/
 results/
 readme.local.md
 projects/*local
-harness/tools
+
 spec/prompts
+.local/
+
+harness/tools/docker/log
+harness/tools/docker/data

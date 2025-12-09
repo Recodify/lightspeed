@@ -173,6 +173,8 @@ class ClickHouseClient:
 
         # Build INSERT query
         query = f"INSERT INTO {table} FORMAT {fmt}"
+
+        logger.info(query)
         query_params["query"] = query
 
         logger.debug(f"Streaming data to {table} in {fmt} format")

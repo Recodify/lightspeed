@@ -7,7 +7,8 @@ A Python-based benchmarking harness for ClickHouse that enables systematic perfo
 ClickHouse offers unprecedented flexibility in schema design compared to traditional databases. For any given use case, you might choose between:
 
 - **Table engines**: MergeTree, ReplacingMergeTree, SummingMergeTree, AggregatingMergeTree, and more
-- **Indexing strategies**: Primary keys, secondary indexes, bloom filters, set indexes
+- **Indexing strategies**: Data-skipping indexes (minmax, bloom filter, set) to prune reads
+- **Order by design**: Choosing the right `ORDER BY` (primary sparse index) for range/pruning efficiency
 - **Partitioning schemes**: By time, by key, by hash, or no partitioning
 - **Compression codecs**: LZ4, ZSTD, Delta, DoubleDelta, Gorilla, and combinations
 - **Materialized views**: Pre-aggregations vs query-time aggregation

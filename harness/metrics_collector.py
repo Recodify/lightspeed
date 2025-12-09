@@ -92,6 +92,19 @@ def collect_query_log_metrics(
     except Exception as e:
         raise MetricsCollectionError(f"Failed to query system.query_log: {e}")
 
+    def _as_int(row: dict, key: str) -> int:
+        """Coerce a query_log field to int, logging and defaulting to 0 on bad data."""
+        try:
+            return int(row[key])
+        except Exception:
+            logger.warning(
+                "Non-numeric query_log value for %s on query_id=%s: %r (defaulting to 0)",
+                key,
+                row.get("query_id"),
+                row.get(key),
+            )
+            return 0
+
     # Build mapping of query_id to metrics
     metrics_map = {}
     executed_ids = set(query_ids)
@@ -107,12 +120,12 @@ def collect_query_log_metrics(
             logger.warning(f"Duplicate query_id in query_log: {query_id} - using latest entry")
 
         metrics_map[query_id] = {
-            "query_duration_ms": row["query_duration_ms"],
-            "read_rows": row["read_rows"],
-            "read_bytes": row["read_bytes"],
-            "result_rows": row["result_rows"],
-            "result_bytes": row["result_bytes"],
-            "memory_usage": row["memory_usage"],
+            "query_duration_ms": _as_int(row, "query_duration_ms"),
+            "read_rows": _as_int(row, "read_rows"),
+            "read_bytes": _as_int(row, "read_bytes"),
+            "result_rows": _as_int(row, "result_rows"),
+            "result_bytes": _as_int(row, "result_bytes"),
+            "memory_usage": _as_int(row, "memory_usage"),
         }
 
     # Check for mismatches
