@@ -7,6 +7,7 @@ from datetime import datetime
 from harness.clickhouse_client import ClickHouseClient
 from harness.config import BenchmarkConfig
 from harness.exceptions import MetricsCollectionError
+from harness.utils import compute_isolated_database_name
 from harness.workload_runner import ExecutionRecord
 
 logger = logging.getLogger(__name__)
@@ -135,3 +136,74 @@ def collect_query_log_metrics(
         logger.debug(f"Successfully collected metrics for all {actual_count} queries")
 
     return metrics_map
+
+
+def collect_variant_resource_usage(
+    config: BenchmarkConfig,
+    client: ClickHouseClient,
+    run_name: str,
+    config_name: str,
+) -> dict:
+    """Collect size on disk and server memory usage for a variant.
+
+    Args:
+        config: Benchmark configuration
+        client: ClickHouse client instance
+        run_name: Run name for isolation (e.g., "brave-penguin")
+        config_name: Config file name (e.g., "example_basic")
+
+    Returns:
+        Dictionary with `size_on_disk_bytes` and `server_memory_usage_bytes`.
+    """
+    database = compute_isolated_database_name(
+        config.project, config_name, run_name, config.variant
+    )
+
+    size_on_disk_bytes = _get_database_size_on_disk(client, database)
+    server_memory_usage_bytes = _get_server_memory_usage(client)
+
+    return {
+        "database": database,
+        "size_on_disk_bytes": size_on_disk_bytes,
+        "server_memory_usage_bytes": server_memory_usage_bytes,
+    }
+
+
+def _get_database_size_on_disk(client: ClickHouseClient, database: str) -> int | None:
+    """Return total bytes on disk for all tables in the given database."""
+    sql = f"""
+        SELECT COALESCE(sum(bytes_on_disk), 0) AS bytes_on_disk
+        FROM system.parts
+        WHERE database = '{database}'
+    """
+
+    try:
+        result = client.execute(sql)
+        if result:
+            return int(result[0].get("bytes_on_disk", 0))
+    except Exception as e:
+        logger.warning(
+            "Failed to collect size_on_disk for database %s: %s", database, e
+        )
+
+    return None
+
+
+def _get_server_memory_usage(client: ClickHouseClient) -> int | None:
+    """Return server memory usage from ClickHouse metrics tables."""
+    queries = [
+        "SELECT toUInt64(value) AS memory_usage FROM system.asynchronous_metrics WHERE metric = 'MemoryTracking'",
+        "SELECT toUInt64(value) AS memory_usage FROM system.metrics WHERE metric = 'MemoryTracking'",
+    ]
+
+    for sql in queries:
+        try:
+            result = client.execute(sql)
+            if result:
+                return int(result[0].get("memory_usage", 0))
+        except Exception as e:
+            logger.warning(
+                "Failed to collect server memory usage with query %s: %s", sql, e
+            )
+
+    return None

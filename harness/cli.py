@@ -19,7 +19,10 @@ from harness.config import (
 )
 from harness.data_loader import load_data
 from harness.exceptions import HarnessError
-from harness.metrics_collector import collect_query_log_metrics
+from harness.metrics_collector import (
+    collect_query_log_metrics,
+    collect_variant_resource_usage,
+)
 from harness.reporter import generate_reports, generate_data_load_reports
 from harness.schema_loader import apply_schema
 from harness.utils import setup_logging, sanitize_name
@@ -246,6 +249,8 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
 
         # Collect metrics from query_log
         logger.debug("Collecting metrics from query_log...")
+        variant_resource_usage = None
+
         with ClickHouseClient(config.clickhouse) as client:
             query_log_metrics = collect_query_log_metrics(
                 config,
@@ -254,6 +259,12 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
                 start_time,
                 end_time,
                 workload_result.get("query_id_prefix"),
+            )
+            variant_resource_usage = collect_variant_resource_usage(
+                config,
+                client,
+                run_name,
+                config_name,
             )
 
         # Generate reports with run_name and config_name
@@ -266,6 +277,7 @@ def cmd_run_workload(args: argparse.Namespace) -> int:
             project_root,
             run_name,
             config_name,
+            variant_resource_usage=variant_resource_usage,
         )
 
         logger.info(f"Results: projects/{config.project}/results/{config_name}/{run_name}/{config.variant}/")
@@ -327,6 +339,7 @@ def cmd_full_run(args: argparse.Namespace) -> int:
             # Resolve variant
             config = resolve_variant_config(base_config, variant_name)
             data_load_metrics = None
+            variant_resource_usage = None
 
             # High-level banner
             logger.info("=" * 60)
@@ -391,6 +404,12 @@ def cmd_full_run(args: argparse.Namespace) -> int:
                     end_time,
                     workload_result.get("query_id_prefix"),
                 )
+                variant_resource_usage = collect_variant_resource_usage(
+                    config,
+                    client,
+                    run_name,
+                    config_name,
+                )
 
             # Generate reports with run_name and config_name
             logger.debug("Generating reports...")
@@ -403,6 +422,7 @@ def cmd_full_run(args: argparse.Namespace) -> int:
                 run_name,
                 config_name,
                 data_load_metrics=data_load_metrics,
+                variant_resource_usage=variant_resource_usage,
             )
 
             # Track result path for later comparisons (prefer JSON)
