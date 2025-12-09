@@ -8,3 +8,6 @@ projects/*local
 
 spec/prompts
 .local/
+
+harness/tools/docker/log
+harness/tools/docker/data

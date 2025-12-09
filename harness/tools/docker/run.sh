@@ -1,13 +1,13 @@
 sudo docker run -d \
---name clickhouse-test \
+--name lightspeed \
+--network host \
 --restart unless-stopped \
--p 8124:8124 \
--p 9001:9001 \
--p 9005:9005 \
---platform linux/arm64/v8 \
+-e CLICKHOUSE_UID=101 -e CLICKHOUSE_GID=101 \
+--platform linux/amd64 \
 --ulimit nofile=262144:262144 \
--v="/data/clickhouse/test:/var/lib/clickhouse" \
--v="/var/log/clickhouse-server/test:/var/log/clickhouse-server" \
--v="/etc/clickhouse-server/test/users.xml:/etc/clickhouse-server/users.xml" \
--v="/etc/clickhouse-server/test/config.xml:/etc/clickhouse-server/config.xml" \
+-v="$(pwd)/data/lightspeed:/var/lib/clickhouse" \
+-v="$(pwd)/log/lightspeed:/var/log/clickhouse-server" \
+-v="$(pwd)/config/users.xml:/etc/clickhouse-server/users.xml" \
+-v="$(pwd)/config/config.xml:/etc/clickhouse-server/config.xml" \
+-v="$(pwd)/../../../projects:/var/lib/clickhouse/user_files/projects:ro" \
 clickhouse/clickhouse-server:22.12.1
