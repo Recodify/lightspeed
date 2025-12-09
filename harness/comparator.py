@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from harness.utils import format_bytes
+
 logger = logging.getLogger(__name__)
 
 
@@ -70,6 +72,34 @@ def _load_results(path: str) -> pd.DataFrame:
 
     # Neither JSON nor CSV found
     raise FileNotFoundError(f"No results file found at {path} (tried .json and .csv)")
+
+
+def _load_metadata(path: str) -> dict:
+    """Load metadata from results.json if available."""
+    path_obj = Path(path)
+
+    if path_obj.is_dir():
+        json_file = path_obj / "results.json"
+        if json_file.exists():
+            path_obj = json_file
+        else:
+            return {}
+
+    if path_obj.suffix != ".json":
+        candidate_json = path_obj.with_suffix(".json")
+        if candidate_json.exists():
+            path_obj = candidate_json
+
+    if not path_obj.exists() or path_obj.suffix != ".json":
+        return {}
+
+    try:
+        with open(path_obj, "r") as f:
+            data = json.load(f)
+        return data.get("metadata", {})
+    except Exception as e:
+        logger.warning(f"Failed to load metadata from {path_obj}: {e}")
+        return {}
 
 
 def compare_results(csv_a_path: str, csv_b_path: str, output_path: str) -> None:
@@ -267,11 +297,13 @@ def compare_all_variants(variant_results: list[tuple[str, str]], output_path: st
     if len(variant_results) < 2:
         raise ValueError("N-way comparison requires at least 2 variants")
 
-    # Load all results
+    # Load all results and metadata
     all_data = {}
+    metadata_by_variant = {}
     for variant_name, result_path in variant_results:
         df = _load_results(result_path)
         all_data[variant_name] = df
+        metadata_by_variant[variant_name] = _load_metadata(result_path)
         logger.debug(f"Loaded {len(df)} queries for variant '{variant_name}'")
 
     # Build unified query list (union of all queries)
@@ -300,7 +332,8 @@ def compare_all_variants(variant_results: list[tuple[str, str]], output_path: st
         variant_results,
         comparison_data,
         rankings,
-        winner_summary
+        winner_summary,
+        metadata_by_variant,
     )
 
     logger.info(f"N-way comparison report written to {output_path}")
@@ -443,7 +476,8 @@ def _generate_nway_report(
     variant_results: list[tuple[str, str]],
     comparison_data: list[dict],
     rankings: dict,
-    winner_summary: dict
+    winner_summary: dict,
+    metadata_by_variant: dict,
 ) -> None:
     """Generate comprehensive N-way comparison Markdown report."""
 
@@ -455,7 +489,7 @@ def _generate_nway_report(
         f.write("# N-Way Benchmark Comparison\n\n")
 
         # Metadata table
-        _write_metadata_table(f, variant_results)
+        _write_metadata_table(f, variant_results, metadata_by_variant)
 
         # Executive summary
         _write_executive_summary(f, winner_summary)
@@ -473,13 +507,21 @@ def _generate_nway_report(
         _write_interpretation_guide(f)
 
 
-def _write_metadata_table(f, variant_results):
+def _write_metadata_table(f, variant_results, metadata_by_variant):
     """Write variants metadata table."""
     f.write(f"**Variants Compared**: {len(variant_results)} variants\n\n")
-    f.write("| Variant | Results Path |\n")
-    f.write("|---------|--------------|\n")
+    f.write("| Variant | Results Path | Size on Disk | Server Memory Usage |\n")
+    f.write("|---------|--------------|-------------|---------------------|\n")
     for variant_name, result_path in variant_results:
-        f.write(f"| {variant_name} | `{result_path}` |\n")
+        metadata = metadata_by_variant.get(variant_name, {}) if metadata_by_variant else {}
+        resources = metadata.get("variant_resources", {})
+        size_on_disk = resources.get("size_on_disk_bytes")
+        server_memory = resources.get("server_memory_usage_bytes")
+        size_display = format_bytes(size_on_disk) if size_on_disk is not None else "N/A"
+        memory_display = format_bytes(server_memory) if server_memory is not None else "N/A"
+        f.write(
+            f"| {variant_name} | `{result_path}` | {size_display} | {memory_display} |\n"
+        )
     f.write("\n---\n\n")
 
 

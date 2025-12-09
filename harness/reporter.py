@@ -24,6 +24,7 @@ def generate_reports(
     run_name: str,
     config_name: str,
     data_load_metrics: dict | None = None,
+    variant_resource_usage: dict | None = None,
 ) -> None:
     """Generate JSON, CSV, and Markdown reports from benchmark results.
 
@@ -39,6 +40,7 @@ def generate_reports(
         run_name: Run name for result isolation (e.g., 'brave-penguin')
         config_name: Config file name (e.g., 'example_basic')
         data_load_metrics: Optional data load metrics to include in reports
+        variant_resource_usage: Optional variant resource metrics to include in reports
     """
     logger.debug("Generating benchmark reports...")
 
@@ -108,7 +110,8 @@ def generate_reports(
         workload_metadata,
         config,
         run_name,
-        config_name
+        config_name,
+        variant_resource_usage,
     )
 
     # Generate CSV report
@@ -116,7 +119,8 @@ def generate_reports(
         csv_path,
         query_stats,
         workload_metadata,
-        config
+        config,
+        variant_resource_usage,
     )
 
     # Generate Markdown report
@@ -124,7 +128,8 @@ def generate_reports(
         md_path,
         query_stats,
         workload_metadata,
-        config
+        config,
+        variant_resource_usage,
     )
 
     # Generate data load outputs if provided
@@ -196,7 +201,8 @@ def _generate_csv_report(
     output_path: Path,
     query_stats: list[dict],
     workload_metadata: dict,
-    config: BenchmarkConfig
+    config: BenchmarkConfig,
+    variant_resource_usage: dict | None = None,
 ) -> None:
     """Generate CSV report with metadata as comments."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -208,6 +214,13 @@ def _generate_csv_report(
         f.write(f"# workload_elapsed_secs: {workload_metadata['workload_elapsed_secs']}\n")
         f.write(f"# project: {config.project}\n")
         f.write(f"# variant: {config.variant}\n")
+        if variant_resource_usage:
+            size_on_disk = variant_resource_usage.get("size_on_disk_bytes")
+            memory_usage = variant_resource_usage.get("server_memory_usage_bytes")
+            if size_on_disk is not None:
+                f.write(f"# size_on_disk_bytes: {size_on_disk}\n")
+            if memory_usage is not None:
+                f.write(f"# server_memory_usage_bytes: {memory_usage}\n")
 
         # Write header
         f.write("query_name,count,errors,error_rate,qps,p50_ms,p95_ms,p99_ms,avg_query_duration_ms,avg_read_rows,avg_read_bytes,avg_memory_usage\n")
@@ -236,7 +249,8 @@ def _generate_markdown_report(
     output_path: Path,
     query_stats: list[dict],
     workload_metadata: dict,
-    config: BenchmarkConfig
+    config: BenchmarkConfig,
+    variant_resource_usage: dict | None = None,
 ) -> None:
     """Generate Markdown report with formatted tables and summary."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -256,6 +270,14 @@ def _generate_markdown_report(
         f.write(f"- **Start Time**: {start_dt.strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write(f"- **End Time**: {end_dt.strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write(f"- **Duration**: {workload_metadata['workload_elapsed_secs']:.2f} seconds\n\n")
+        if variant_resource_usage:
+            size_on_disk = variant_resource_usage.get("size_on_disk_bytes")
+            memory_usage = variant_resource_usage.get("server_memory_usage_bytes")
+            if size_on_disk is not None:
+                f.write(f"- **Size on Disk**: {format_bytes(size_on_disk)}\n")
+            if memory_usage is not None:
+                f.write(f"- **Server Memory Usage**: {format_bytes(memory_usage)}\n")
+            f.write("\n")
 
         # Performance table
         f.write("## Query Performance\n\n")
@@ -299,7 +321,8 @@ def _generate_json_report(
     workload_metadata: dict,
     config: BenchmarkConfig,
     run_name: str,
-    config_name: str
+    config_name: str,
+    variant_resource_usage: dict | None = None,
 ) -> None:
     """Generate JSON report with structured data."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -335,6 +358,9 @@ def _generate_json_report(
             "overall_qps": overall_qps
         }
     }
+
+    if variant_resource_usage:
+        report_data["metadata"]["variant_resources"] = variant_resource_usage
 
     with open(output_path, "w") as f:
         json.dump(report_data, f, indent=2)
