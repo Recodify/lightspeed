@@ -1,0 +1,70 @@
+project: keyselection
+
+
+
+# Project-level defaults (shared across all variants)
+clickhouse:
+  host: localhost
+  port: 8123
+  user: default
+  password: "default"
+
+workload:
+  name: basic_benchmark
+  path: .
+  concurrency: 4
+  duration_seconds: 60
+  ramp_up_seconds: 2
+  warmup_queries: 50
+  think_time_ms: 5
+  max_errors: 100
+  query_timeout_seconds: 60
+
+# Define variants with different data configurations
+variants:
+  uuidkey:
+    description: "uuid key"
+    data:
+      load_method: script
+      load:
+        - table: timeseriesdata
+          file: datahot.parquet
+          script: load.sql
+          format: Parquet 
+  uint32key:
+    description: "uint32 key"
+    data:
+      load_method: script
+      load:
+        - table: timeseriesdata
+          file: datahot.parquet
+          script: load.sql
+          format: Parquet
+  uint16key:
+    description: "uint16 key"
+    data:
+      load_method: script
+      load:
+        - table: timeseriesdata
+          file: datahot.parquet
+          script: load.sql
+          format: Parquet
+  stringkey:
+    description: "string key"
+    data:
+      load_method: script
+      load:
+        - table: timeseriesdata
+          file: datahot.parquet
+          script: load.sql
+          format: Parquet
+  lowcardinalitykey:
+    description: "low cardinality key"
+    data:
+      load_method: script
+      load:
+        - table: timeseriesdata
+          file: datahot.parquet
+          script: load.sql
+          format: Parquet
+  

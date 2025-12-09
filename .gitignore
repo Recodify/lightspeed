@@ -3,6 +3,7 @@ coverage/
 *.egg-info/
 __pycache__/
 results/
+data/
 readme.local.md
 projects/*local
 

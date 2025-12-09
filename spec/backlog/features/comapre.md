@@ -1,0 +1,4 @@
+- Move section 2 "rankings" to be the first section and move section 1 "side by side" to be the second section
+- Included a summary/description of what the queries are
+- Winner is currently based on p_50 only, that might be ok but perhaps we should also have qps, size on disk and memory usage as metrics that decide a winner
+- 

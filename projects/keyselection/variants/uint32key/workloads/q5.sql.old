@@ -1,0 +1,13 @@
+/* Q5 — Join fact to dimension by key (count-only) */
+/* KEY TYPE: UInt16 */
+/* SCHEMA: timeseriesdata(id UInt16, timestamp DateTime64(3)) */
+
+SELECT
+  d.group_id,
+  count() AS cnt
+FROM timeseriesdata AS f
+INNER JOIN dim_id AS d
+  ON f.id = d.id
+WHERE f.timestamp >= toDateTime('2025-12-14')
+  AND f.timestamp <  toDateTime('2025-12-18')
+GROUP BY d.group_id

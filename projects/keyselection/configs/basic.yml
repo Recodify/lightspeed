@@ -1,0 +1,24 @@
+project: keyselection
+
+# Project-level defaults (shared across all variants)
+clickhouse:
+  host: localhost
+  port: 8123
+  user: default
+  password: "default"
+
+workload:
+  name: basic_benchmark
+  path: baseline
+
+# Define variants with different data configurations
+variants:
+  stringkey:
+    description: "Baseline simple case using string key"
+    data:
+      load_method: script
+      load:
+        - table: timeseriesdata
+          file: data.parquet
+          script: load.sql
+          format: Parquet

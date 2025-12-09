@@ -1,0 +1,9 @@
+SELECT
+  d.group_id,
+  count() AS cnt
+FROM timeseriesdata AS f
+INNER JOIN dim_uuid AS d
+  ON f.uuid_id = d.uuid_id
+WHERE f.timestamp >= toDateTime('2025-12-14')
+  AND f.timestamp <  toDateTime('2025-12-18')
+GROUP BY d.group_id
